@@ -3,4 +3,6 @@ numpy>=1.21.0
 librosa>=0.10.0
 scipy>=1.10.0
 matplotlib>=3.7.0
-pygame>=2.5.0
+sounddevice>=0.4.6
+soundfile>=0.12.1
+huggingface_hub>=0.19.0

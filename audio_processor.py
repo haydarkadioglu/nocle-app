@@ -2,8 +2,10 @@ import tensorflow as tf
 import numpy as np
 import librosa
 
+from setup import Setup
+
 class AudioProcessor:
-    def __init__(self, target_sample_rate=16000):
+    def __init__(self, target_sample_rate=Setup.SAMPLE_RATE):
         self.target_sample_rate = target_sample_rate
 
     def get_audio_in_batches(self, path, batching_size=12000):

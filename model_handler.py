@@ -3,9 +3,10 @@ import numpy as np
 
 class ModelHandler:
     def __init__(self, model_path, audio_processor):
+        from setup import Setup
         self.model = tf.keras.models.load_model(model_path)
-        # Compile the model with default optimizer and loss
-        self.model.compile(optimizer='adam', loss='mse')
+        # Compile the model with configured optimizer and loss
+        self.model.compile(optimizer=Setup.MODEL_OPTIMIZER, loss=Setup.MODEL_LOSS)
         self.audio_processor = audio_processor
 
     def predict(self, path, batching_size=12000, use_filters=False, filter_params=None):

@@ -6,7 +6,8 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import librosa
-import pygame
+import sounddevice as sd
+import soundfile as sf
 import threading
 import time
 import librosa.display
@@ -35,13 +36,14 @@ class NocleGUI:
         self.canvas_processed = None
         
         # Audio playback components
-        pygame.mixer.init()
         self.is_playing = False
         self.current_player = None  # 'original' or 'processed'
         self.play_thread = None
-        self.audio_length = 0  # Length of audio in seconds
         self.update_time_thread = None
-        self.is_updating_slider = False
+        self.stream = None
+        self.current_frame = 0
+        self.audio_data = None
+        self.sample_rate = 16000
         
         self._create_widgets()
         self._load_model()
@@ -115,12 +117,10 @@ class NocleGUI:
         ttk.Button(original_frame, text="Play", command=lambda: self._play_audio('original')).grid(row=0, column=1, padx=2)
         ttk.Button(original_frame, text="Stop", command=self._stop_audio).grid(row=0, column=2, padx=2)
         
-        # Time slider for original audio
-        self.original_slider = ttk.Scale(original_frame, from_=0, to=100, orient=tk.HORIZONTAL, 
-                                       command=lambda x: self._seek_audio('original'))
-        self.original_slider.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), padx=5, pady=5)
-        self.original_time_label = ttk.Label(original_frame, text="0:00 / 0:00")
-        self.original_time_label.grid(row=2, column=0, columnspan=3)
+        # Time display for original audio
+        ttk.Label(original_frame, text="Time (s):").grid(row=1, column=0, padx=5)
+        self.original_time_label = ttk.Label(original_frame, text="0")
+        self.original_time_label.grid(row=1, column=1)
 
         # Processed audio frame (initially hidden)
         self.processed_frame = ttk.Frame(self.playback_frame)
@@ -131,12 +131,10 @@ class NocleGUI:
         ttk.Button(self.processed_frame, text="Play", command=lambda: self._play_audio('processed')).grid(row=0, column=1, padx=2)
         ttk.Button(self.processed_frame, text="Stop", command=self._stop_audio).grid(row=0, column=2, padx=2)
         
-        # Time slider for processed audio
-        self.processed_slider = ttk.Scale(self.processed_frame, from_=0, to=100, orient=tk.HORIZONTAL,
-                                        command=lambda x: self._seek_audio('processed'))
-        self.processed_slider.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), padx=5, pady=5)
-        self.processed_time_label = ttk.Label(self.processed_frame, text="0:00 / 0:00")
-        self.processed_time_label.grid(row=2, column=0, columnspan=3)
+        # Time display for processed audio
+        ttk.Label(self.processed_frame, text="Time (s):").grid(row=1, column=0, padx=5)
+        self.processed_time_label = ttk.Label(self.processed_frame, text="0")
+        self.processed_time_label.grid(row=1, column=1)
 
     def _load_model(self):
         try:
@@ -158,13 +156,10 @@ class NocleGUI:
             # Show original audio controls
             self.playback_frame.grid()
             
-            # Get audio length
+            # Calculate total duration and update display
             audio_data = self.audio_processor.get_audio(self.current_audio_path)
-            self.audio_length = len(audio_data) / 16000  # Sample rate is 16000
-            
-            # Update original audio time label
-            self.original_time_label.config(text=f"0:00 / {int(self.audio_length//60)}:{int(self.audio_length%60):02d}")
-            self.original_slider.set(0)
+            total_duration = int(len(audio_data) / 16000)  # Sample rate is 16000
+            self.original_time_label.config(text=f"0 / {total_duration}")
 
     def _process_audio(self):
         if not self.current_audio_path:
@@ -204,24 +199,20 @@ class NocleGUI:
             # Show processed audio controls
             self.processed_frame.grid()
             
-            # Update processed audio time label
-            self.processed_time_label.config(text=f"0:00 / {int(self.audio_length//60)}:{int(self.audio_length%60):02d}")
-            self.processed_slider.set(0)
+            # Update processed audio time label with total duration
+            total_duration = int(len(predicted_audio) / 16000)
+            self.processed_time_label.config(text=f"0 / {total_duration}")
             
             if self.show_spectrograms.get():
                 self._create_spectrogram_window()
 
-            # Save processed audio
-            output_path = filedialog.asksaveasfilename(
-                defaultextension=".wav",
-                filetypes=[("WAV files", "*.wav")],
-                initialfile="processed_audio.wav"
-            )
+            # Show save button for processed audio
+            self.status_var.set("Processing completed successfully")
             
-            if output_path:
-                self.audio_processor.save_audio(predicted_audio, output_path)
-                self.status_var.set("Processing completed successfully")
-                messagebox.showinfo("Success", "Audio processing completed")
+            # Add save button to processed frame if not already added
+            if not hasattr(self, 'save_button'):
+                self.save_button = ttk.Button(self.processed_frame, text="Save", command=self._save_processed_audio)
+                self.save_button.grid(row=0, column=3, padx=2)
             
             self.progress_var.set(100)
 
@@ -309,103 +300,149 @@ class NocleGUI:
         self._stop_audio()  # Stop any currently playing audio
         
         if audio_type == 'original':
-            pygame.mixer.music.load(self.current_audio_path)
-            current_slider = self.original_slider
+            data, sr = sf.read(self.current_audio_path)
+            self.current_time_label = self.original_time_label
         else:  # processed
-            # Save temporary file for processed audio
-            temp_path = "temp_processed.wav"
-            self.audio_processor.save_audio(self.processed_audio, temp_path)
-            pygame.mixer.music.load(temp_path)
-            current_slider = self.processed_slider
+            data = self.processed_audio
+            sr = 16000
+            self.current_time_label = self.processed_time_label
             
+        # Calculate and store total duration
+        self.total_duration = int(len(data) / sr)
+        
+        self.audio_data = data
+        self.sample_rate = sr
+        self.current_frame = 0  # Start from beginning
+        
+        def callback(outdata, frames, time, status):
+            if status:
+                print(status)
+            if not self.is_playing:
+                raise sd.CallbackStop()
+            
+            chunk = self.audio_data[self.current_frame:self.current_frame + frames]
+            if len(chunk) < frames:
+                outdata[:len(chunk), 0] = chunk
+                outdata[len(chunk):] = 0
+                raise sd.CallbackStop()
+            else:
+                outdata[:, 0] = chunk
+                self.current_frame += frames
+        
         self.is_playing = True
         self.current_player = audio_type
         
-        # Start playing from slider position
-        start_pos = current_slider.get() / 100.0
-        pygame.mixer.music.play(start=start_pos * self.audio_length)
+        # Start audio stream
+        self.stream = sd.OutputStream(
+            samplerate=sr,
+            channels=1,
+            callback=callback,
+            finished_callback=self._on_playback_finished
+        )
+        self.stream.start()
         
-        # Start monitoring thread
-        self.play_thread = threading.Thread(target=self._monitor_playback)
-        self.play_thread.daemon = True
-        self.play_thread.start()
+        # Stop previous update thread if exists
+        if hasattr(self, 'update_time_thread') and self.update_time_thread:
+            self.is_playing = False
+            self.update_time_thread.join(timeout=1.0)
         
-        # Start time update thread
+        # Start new time update thread
+        self.is_playing = True
         self.update_time_thread = threading.Thread(target=self._update_time)
         self.update_time_thread.daemon = True
         self.update_time_thread.start()
 
     def _stop_audio(self):
         """Stop audio playback"""
-        if self.is_playing:
-            pygame.mixer.music.stop()
-            self.is_playing = False
-            self.current_player = None
-
-    def _monitor_playback(self):
-        """Monitor audio playback and update status"""
-        while self.is_playing and pygame.mixer.music.get_busy():
-            time.sleep(0.1)
-        
+        # Stop playback first
         self.is_playing = False
+        if self.stream is not None:
+            self.stream.stop()
+            self.stream.close()
+            self.stream = None
+        
+        # Wait for update thread to finish
+        if hasattr(self, 'update_time_thread') and self.update_time_thread:
+            self.update_time_thread.join(timeout=1.0)
+            self.update_time_thread = None
+        
         self.current_player = None
         
-        # Reset slider position when playback ends
+        # Reset time display
+        if hasattr(self, 'current_time_label'):
+            self.root.after_idle(
+                lambda: self.current_time_label.config(text=f"0 / {self.total_duration}")
+            )
+
+    def _on_playback_finished(self):
+        """Called when playback is finished"""
+        self.is_playing = False
+        self.current_player = None
+        self.stream = None
+        self.root.after(0, self._reset_slider)
+
+    def _reset_slider(self):
+        """Reset slider position when playback ends"""
         if self.current_player == 'original':
             self.original_slider.set(0)
         else:
             self.processed_slider.set(0)
 
     def _update_time(self):
-        """Update time labels and sliders during playback"""
-        while self.is_playing and pygame.mixer.music.get_busy():
-            if not self.is_updating_slider:
-                current_pos = pygame.mixer.music.get_pos() / 1000.0  # Current position in seconds
+        """Update time display during playback"""
+        last_pos = -1  # Track last position to avoid unnecessary updates
+        
+        while self.is_playing:
+            try:
+                if self.audio_data is not None and hasattr(self, 'current_frame'):
+                    current_pos = int(self.current_frame / self.sample_rate)
+                    
+                    # Only update if position changed
+                    if current_pos != last_pos:
+                        last_pos = current_pos
+                        # Update time label in the main thread
+                        self.root.after(10, lambda p=current_pos: 
+                            self.current_time_label.config(text=f"{p} / {self.total_duration}")
+                        )
                 
-                # Update appropriate slider and label
-                if self.current_player == 'original':
-                    self.original_slider.set((current_pos / self.audio_length) * 100)
-                    mins, secs = divmod(int(current_pos), 60)
-                    total_mins, total_secs = divmod(int(self.audio_length), 60)
-                    self.original_time_label.config(
-                        text=f"{mins}:{secs:02d} / {total_mins}:{total_secs:02d}")
-                else:
-                    self.processed_slider.set((current_pos / self.audio_length) * 100)
-                    mins, secs = divmod(int(current_pos), 60)
-                    total_mins, total_secs = divmod(int(self.audio_length), 60)
-                    self.processed_time_label.config(
-                        text=f"{mins}:{secs:02d} / {total_mins}:{total_secs:02d}")
-            
-            time.sleep(0.1)
+                time.sleep(0.1)
+            except Exception as e:
+                print(f"Error updating time: {e}")
+                break
 
-    def _seek_audio(self, audio_type):
-        """Handle slider position change"""
-        if not self.is_playing:
+    def _on_playback_finished(self):
+        """Called when playback is finished"""
+        self.is_playing = False
+        self.current_player = None
+        if self.stream is not None:
+            self.stream.stop()
+            self.stream.close()
+            self.stream = None
+        
+        # Reset time display
+        self.root.after_idle(
+            lambda: self.current_time_label.config(text="0")
+        )
+
+    def _save_processed_audio(self):
+        """Save the processed audio to a user-selected location"""
+        if self.processed_audio is None:
+            messagebox.showwarning("Warning", "No processed audio to save")
             return
             
-        self.is_updating_slider = True
-        if audio_type == 'original':
-            pos = self.original_slider.get()
-        else:
-            pos = self.processed_slider.get()
-            
-        # Calculate position in seconds
-        seek_time = (pos / 100.0) * self.audio_length
+        output_path = filedialog.asksaveasfilename(
+            defaultextension=".wav",
+            filetypes=[("WAV files", "*.wav")],
+            initialfile="processed_audio.wav"
+        )
         
-        # Stop and restart playback at new position
-        pygame.mixer.music.stop()
-        if audio_type == 'original':
-            pygame.mixer.music.load(self.current_audio_path)
-        else:
-            temp_path = "temp_processed.wav"
-            pygame.mixer.music.load(temp_path)
-            
-        pygame.mixer.music.play(start=seek_time)
-        self.is_updating_slider = False
+        if output_path:
+            self.audio_processor.save_audio(self.processed_audio, output_path)
+            messagebox.showinfo("Success", "Audio saved successfully")
 
     def __del__(self):
         """Cleanup when the application closes"""
-        pygame.mixer.quit()
+        self._stop_audio()  # Stop any playing audio
         # Remove temporary file if it exists
         if os.path.exists("temp_processed.wav"):
             try:
