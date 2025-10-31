@@ -1,6 +1,6 @@
 # Nocle - AI-Powered Audio Noise Reduction App
 
-Nocle is a desktop application that uses artificial intelligence to reduce background noise in audio recordings. It provides a simple and user-friendly interface for cleaning up your audio files.
+Nocle (Noise Cleaner) is a desktop application that uses artificial intelligence to reduce background noise in audio recordings. It provides a simple and user-friendly interface for cleaning up your audio files.
 
 ![Main](images/1.png)
 
@@ -129,5 +129,19 @@ The application uses a custom-trained deep learning model for noise reduction:
 
 This project is licensed under the GNU License - see the LICENSE file for details.
 
+## Authors
 
+### Lead Developer
+- **Haydar Kadıoğlu**
+  - GitHub: [@haydarkadioglu](https://github.com/haydarkadioglu)
+  - LinkedIn: [Haydar Kadıoğlu](https://www.linkedin.com/in/haydar-kadioglu/)
+
+### Project Details
+- **Latest Version**: 1.0.0
+- **Status**: Active Development
+
+### Contact
+For questions, suggestions, or collaborations:
+- Email: haydarkadioglu@gmail.com
+- Project Issues: [GitHub Issues](https://github.com/haydarkadioglu/nocle-app/issues)
 
