@@ -134,7 +134,7 @@ This project is licensed under the GNU License - see the LICENSE file for detail
 ### Lead Developer
 - **Haydar Kadıoğlu**
   - GitHub: [@haydarkadioglu](https://github.com/haydarkadioglu)
-  - LinkedIn: [Haydar Kadıoğlu](https://www.linkedin.com/in/haydar-kadioglu/)
+  - LinkedIn: [Haydar Kadıoğlu](https://www.linkedin.com/in/haydarkadioglu/)
 
 ### Project Details
 - **Latest Version**: 1.0.0
@@ -142,6 +142,6 @@ This project is licensed under the GNU License - see the LICENSE file for detail
 
 ### Contact
 For questions, suggestions, or collaborations:
-- Email: haydarkadioglu@gmail.com
+- Email: a.haydar.kadioglu@hotmail.com
 - Project Issues: [GitHub Issues](https://github.com/haydarkadioglu/nocle-app/issues)
 
