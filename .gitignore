@@ -1,4 +1,4 @@
-.hdf5
+*.hdf5
 __pycache__/
 *.pyc
 .venv/
