@@ -4,3 +4,5 @@ __pycache__/
 .venv/
 env/
 */.cache/
+test_flet.py
+test_flet2.py

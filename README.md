@@ -1,19 +1,18 @@
 # Nocle - AI-Powered Audio Noise Reduction App
 
-Nocle (Noise Cleaner) is a desktop application that uses artificial intelligence to reduce background noise in audio recordings. It provides a simple and user-friendly interface for cleaning up your audio files.
+Nocle (Noise Cleaner) is a desktop application that uses artificial intelligence to reduce background noise in audio recordings. It provides a modern, sleek, and user-friendly interface for cleaning up your audio files.
 
 ![Main](images/1.png)
 
-
-
 ## Features
 
-- AI-powered noise reduction
-- Real-time audio playback
-- Multiple audio filtering options
-- Spectrogram visualization
-- Easy-to-use interface
-- WAV file support
+- **Modern & Beautiful UI:** Redesigned with Flet, featuring a Dark Mode out of the box and an intuitive tab-based layout.
+- **Built-in Guide:** Explanations of how filters and the model works directly inside the "Nasıl Kullanılır" (Guide) tab.
+- **AI-powered noise reduction:** Deep learning models working behind the scenes.
+- **Real-time audio playback:** Play, stop, and compare original vs. processed audio instantly.
+- **Multiple audio filtering options:** Spectral Gate, Wiener Filter, and Gaussian Blur.
+- **Spectrogram visualization:** Crisp SVG-based spectrogram charts comparing audio frequency data.
+- **WAV file support.**
 
 ## Installation
 
@@ -74,18 +73,21 @@ python main.py
 
 ## Understanding the Interface
 
+### Navigation Tabs
+- **🎵 Ses Temizleme (Main Tab)**: The main workspace for importing, processing, and exporting audio files.
+- **📖 Nasıl Kullanılır? (Guide Tab)**: A built-in manual explaining step-by-step usage and deep-dives into what each filter does.
+
 ### Main Controls
-- **File Selection**: Top section for selecting input audio files
-- **Filter Options**: Middle section for choosing and configuring filters
-- **Audio Controls**: Bottom section showing playback controls
-- **Progress Bar**: Shows processing progress
-- **Status Messages**: Displays current operation status
+- **File Selection**: Select input audio files (`.wav`).
+- **Filter Options**: Switch filters on/off and set numeric parameters inside the interactive card.
+- **Audio Controls**: Interactive playback controls for both original and enhanced audio.
+- **Progress Bar & Status Messages**: Dynamic indicators for processing tasks.
 
 ### Filter Parameters
 - **Wiener Size**: Controls the strength of the Wiener filter (3-31)
 - **Gaussian Sigma**: Adjusts the smoothing effect (0.1-5.0)
 
-### Audio Playback
+## Audio Playback
 - Play/Stop buttons for both original and processed audio
 - Real-time playback time display
 - Independent controls for comparing audio files

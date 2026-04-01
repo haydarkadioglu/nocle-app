@@ -1,10 +1,9 @@
-import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+import flet as ft
 import os
 import numpy as np
-import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('svg')
 from matplotlib.figure import Figure
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import librosa
 import sounddevice as sd
 import soundfile as sf
@@ -14,309 +13,396 @@ import librosa.display
 from audio_processor import AudioProcessor
 from model_handler import ModelHandler
 from filters import AudioFilters
+import io
+import base64
 
 class NocleGUI:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Nocle Audio Processing")
-        self.root.geometry("800x700")
+    def __init__(self, page: ft.Page):
+        self.page = page
+        self.page.title = "Nocle Audio Processing"
+        self.page.theme_mode = ft.ThemeMode.DARK
+        self.page.padding = 20
+        self.page.scroll = ft.ScrollMode.AUTO
         
+        # Flet Snackbar for messages
+        self.page.snack_bar = ft.SnackBar(ft.Text(""), open=False)
+
         # Initialize components
         self.audio_processor = AudioProcessor()
         self.model_handler = None
         self.current_audio_path = None
         self.output_path = None
         self.processed_audio = None
-        self.spectrogram_window = None
-        self.fig_original = None
-        self.fig_processed = None
-        self.ax_original = None
-        self.ax_processed = None
-        self.canvas_original = None
-        self.canvas_processed = None
         
         # Audio playback components
         self.is_playing = False
-        self.current_player = None  # 'original' or 'processed'
+        self.current_player = None
         self.play_thread = None
         self.update_time_thread = None
         self.stream = None
         self.current_frame = 0
         self.audio_data = None
         self.sample_rate = 16000
+        self.total_duration = 0
         
-        self._create_widgets()
+        self.setup_ui()
         self._load_model()
 
-    def _create_widgets(self):
-        # Main frame
-        main_frame = ttk.Frame(self.root, padding="10")
-        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+    def show_message(self, text, is_error=False):
+        self.page.snack_bar.content = ft.Text(text)
+        self.page.snack_bar.bgcolor = ft.colors.ERROR if is_error else ft.colors.GREEN_700
+        self.page.snack_bar.open = True
+        self.page.update()
 
-        # File selection
-        ttk.Label(main_frame, text="Audio File:").grid(row=0, column=0, sticky=tk.W)
-        self.file_path_var = tk.StringVar()
-        ttk.Entry(main_frame, textvariable=self.file_path_var, width=50).grid(row=0, column=1, padx=5)
-        ttk.Button(main_frame, text="Browse", command=self._browse_file).grid(row=0, column=2)
+    def setup_ui(self):
+        # File Picker setup
+        self.file_picker = ft.FilePicker(on_result=self.on_file_selected)
+        self.save_file_picker = ft.FilePicker(on_result=self.on_file_saved)
+        self.page.overlay.extend([self.file_picker, self.save_file_picker])
 
-        # Filter options
-        filter_frame = ttk.LabelFrame(main_frame, text="Filter Options", padding="5")
-        filter_frame.grid(row=1, column=0, columnspan=3, pady=10, sticky=(tk.W, tk.E))
+        # Header
+        header = ft.Row([
+            ft.Icon(ft.icons.MULTITRACK_AUDIO_ROUNDED, size=40, color=ft.colors.AMBER_400),
+            ft.Text("Nocle Audio Enhancer", size=32, weight=ft.FontWeight.BOLD, color=ft.colors.INDIGO_300)
+        ], alignment=ft.MainAxisAlignment.CENTER)
 
-        # Checkboxes for filters
-        self.use_spectral_gate = tk.BooleanVar(value=False)
-        ttk.Checkbutton(filter_frame, text="Spectral Gate", variable=self.use_spectral_gate).grid(row=0, column=0)
+        # File Selection Area
+        self.file_path_text = ft.TextField(label="Selected Audio File", read_only=True, expand=True)
+        browse_btn = ft.ElevatedButton(
+            "Browse File", 
+            icon=ft.icons.FOLDER_OPEN,
+            on_click=lambda _: self.file_picker.pick_files(allowed_extensions=["wav"], allow_multiple=False),
+            style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8))
+        )
+        file_row = ft.Row([self.file_path_text, browse_btn], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
 
-        self.use_wiener = tk.BooleanVar(value=False)
-        ttk.Checkbutton(filter_frame, text="Wiener Filter", variable=self.use_wiener).grid(row=0, column=1)
-
-        self.use_gaussian = tk.BooleanVar(value=False)
-        ttk.Checkbutton(filter_frame, text="Gaussian Blur", variable=self.use_gaussian).grid(row=0, column=2)
-
-        # Show Spectrograms option
-        self.show_spectrograms = tk.BooleanVar(value=False)
-        ttk.Checkbutton(filter_frame, text="Show Spectrograms", 
-                       variable=self.show_spectrograms).grid(row=0, column=3)
-
-        # Filter parameters
-        param_frame = ttk.Frame(filter_frame)
-        param_frame.grid(row=1, column=0, columnspan=3, pady=5)
-
-        ttk.Label(param_frame, text="Wiener Size:").grid(row=0, column=0)
-        self.wiener_size = ttk.Spinbox(param_frame, from_=3, to=31, increment=2, width=5)
-        self.wiener_size.set(15)
-        self.wiener_size.grid(row=0, column=1, padx=5)
-
-        ttk.Label(param_frame, text="Gaussian Sigma:").grid(row=0, column=2, padx=5)
-        self.gaussian_sigma = ttk.Spinbox(param_frame, from_=0.1, to=5.0, increment=0.1, width=5)
-        self.gaussian_sigma.set(2.0)
-        self.gaussian_sigma.grid(row=0, column=3, padx=5)
-
-        # Process button
-        ttk.Button(main_frame, text="Process Audio", command=self._process_audio).grid(row=2, column=0, columnspan=3, pady=10)
-
-        # Progress bar
-        self.progress_var = tk.DoubleVar()
-        self.progress_bar = ttk.Progressbar(main_frame, variable=self.progress_var, maximum=100)
-        self.progress_bar.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=5)
-
-        # Status label
-        self.status_var = tk.StringVar(value="Ready")
-        ttk.Label(main_frame, textvariable=self.status_var).grid(row=4, column=0, columnspan=3)
-
-        # Audio playback frame (initially hidden)
-        self.playback_frame = ttk.LabelFrame(main_frame, text="Audio Controls", padding="5")
-        self.playback_frame.grid(row=5, column=0, columnspan=3, pady=10, sticky=(tk.W, tk.E))
-        self.playback_frame.grid_remove()  # Hide initially
-
-        # Original audio controls
-        original_frame = ttk.Frame(self.playback_frame)
-        original_frame.grid(row=0, column=0, columnspan=3, pady=5, sticky=(tk.W, tk.E))
+        # Filter Options Panel
+        self.use_spectral_gate = ft.Switch(label="Spectral Gate", value=False)
+        self.use_wiener = ft.Switch(label="Wiener Filter", value=False)
+        self.use_gaussian = ft.Switch(label="Gaussian Blur", value=False)
+        self.show_spectrograms = ft.Switch(label="Show Spectrograms", value=False)
         
-        ttk.Label(original_frame, text="Original Audio:").grid(row=0, column=0, padx=5)
-        ttk.Button(original_frame, text="Play", command=lambda: self._play_audio('original')).grid(row=0, column=1, padx=2)
-        ttk.Button(original_frame, text="Stop", command=self._stop_audio).grid(row=0, column=2, padx=2)
-        
-        # Time display for original audio
-        ttk.Label(original_frame, text="Time (s):").grid(row=1, column=0, padx=5)
-        self.original_time_label = ttk.Label(original_frame, text="0")
-        self.original_time_label.grid(row=1, column=1)
+        filter_switches = ft.Row([self.use_spectral_gate, self.use_wiener, self.use_gaussian, self.show_spectrograms], wrap=True)
 
-        # Processed audio frame (initially hidden)
-        self.processed_frame = ttk.Frame(self.playback_frame)
-        self.processed_frame.grid(row=1, column=0, columnspan=3, pady=5, sticky=(tk.W, tk.E))
-        self.processed_frame.grid_remove()  # Hide initially
+        self.wiener_size = ft.TextField(label="Wiener Size", value="15", width=120, keyboard_type=ft.KeyboardType.NUMBER)
+        self.gaussian_sigma = ft.TextField(label="Gaussian Sigma", value="2.0", width=120, keyboard_type=ft.KeyboardType.NUMBER)
+        filter_params = ft.Row([self.wiener_size, self.gaussian_sigma])
+
+        filter_panel = ft.Card(
+            content=ft.Container(
+                content=ft.Column([
+                    ft.Text("Filter Settings", size=20, weight=ft.FontWeight.W_600),
+                    ft.Divider(height=10),
+                    filter_switches,
+                    ft.Container(height=5),
+                    filter_params
+                ]),
+                padding=20
+            ),
+            elevation=2
+        )
+
+        # Processing section
+        self.process_btn = ft.ElevatedButton(
+            "Process Audio", 
+            icon=ft.icons.AUTO_AWESOME,
+            on_click=self._process_audio,
+            style=ft.ButtonStyle(
+                shape=ft.RoundedRectangleBorder(radius=8),
+                bgcolor=ft.colors.INDIGO_700,
+                color=ft.colors.WHITE
+            ),
+            width=200, height=50
+        )
+        self.progress_bar = ft.ProgressBar(value=0, visible=False, expand=True)
+        self.status_text = ft.Text("Ready", italic=True)
         
-        ttk.Label(self.processed_frame, text="Processed Audio:").grid(row=0, column=0, padx=5)
-        ttk.Button(self.processed_frame, text="Play", command=lambda: self._play_audio('processed')).grid(row=0, column=1, padx=2)
-        ttk.Button(self.processed_frame, text="Stop", command=self._stop_audio).grid(row=0, column=2, padx=2)
+        process_row = ft.Row([self.process_btn, self.progress_bar], alignment=ft.MainAxisAlignment.START)
         
-        # Time display for processed audio
-        ttk.Label(self.processed_frame, text="Time (s):").grid(row=1, column=0, padx=5)
-        self.processed_time_label = ttk.Label(self.processed_frame, text="0")
-        self.processed_time_label.grid(row=1, column=1)
+        # Audio Players section
+        # Original
+        self.original_time = ft.Text("0:00 / 0:00", weight=ft.FontWeight.BOLD)
+        self.original_play_btn = ft.IconButton(icon=ft.icons.PLAY_ARROW, on_click=lambda _: self._play_audio('original'), disabled=True, icon_color=ft.colors.GREEN_400)
+        self.original_stop_btn = ft.IconButton(icon=ft.icons.STOP, on_click=lambda _: self._stop_audio(), disabled=True, icon_color=ft.colors.RED_400)
+        
+        original_player = ft.Card(
+            content=ft.Container(
+                content=ft.Column([
+                    ft.Text("Original Audio", weight=ft.FontWeight.BOLD, size=16),
+                    ft.Divider(),
+                    ft.Row([self.original_play_btn, self.original_stop_btn, self.original_time])
+                ]),
+                padding=15
+            ),
+            expand=True
+        )
+        
+        # Processed
+        self.processed_time = ft.Text("0:00 / 0:00", weight=ft.FontWeight.BOLD)
+        self.processed_play_btn = ft.IconButton(icon=ft.icons.PLAY_ARROW, on_click=lambda _: self._play_audio('processed'), disabled=True, icon_color=ft.colors.GREEN_400)
+        self.processed_stop_btn = ft.IconButton(icon=ft.icons.STOP, on_click=lambda _: self._stop_audio(), disabled=True, icon_color=ft.colors.RED_400)
+        self.save_btn = ft.ElevatedButton("Save", icon=ft.icons.SAVE, on_click=lambda _: self.save_file_picker.save_file(allowed_extensions=["wav"], file_name="processed_audio.wav"), disabled=True, bgcolor=ft.colors.AMBER_700)
+
+        processed_player = ft.Card(
+            content=ft.Container(
+                content=ft.Column([
+                    ft.Text("Processed Audio", weight=ft.FontWeight.BOLD, size=16),
+                    ft.Divider(),
+                    ft.Row([self.processed_play_btn, self.processed_stop_btn, self.processed_time, ft.Container(expand=True), self.save_btn])
+                ]),
+                padding=15
+            ),
+            expand=True
+        )
+
+        self.players_row = ft.Row([original_player, processed_player], expand=True, visible=False)
+
+        # Spectrogram area
+        self.spectrogram_container = ft.Column(visible=False)
+
+        # Assembling the Main Audio Tab
+        main_tab_content = ft.Column([
+            header,
+            ft.Divider(height=30),
+            file_row,
+            ft.Container(height=10),
+            filter_panel,
+            ft.Container(height=20),
+            process_row,
+            ft.Container(height=5),
+            self.status_text,
+            ft.Container(height=20),
+            self.players_row,
+            ft.Divider(height=30),
+            self.spectrogram_container
+        ], scroll=ft.ScrollMode.AUTO)
+
+        # "Nasıl Kullanılır" (Guide) Tab Content
+        guide_md = """
+# Nocle Uygulamasına Hoş Geldiniz
+
+**Nocle**, yapay zeka (Deep Learning) destekli, ses dosyalarındaki arka plan gürültülerini temizleyen güçlü bir uygulamadır. 
+
+### 1. Temel Kullanım
+
+1. **Dosya Seçin:** "Browse File" düğmesine tıklayın ve `.wav` formatındaki gürültülü ses kaydınızı yükleyin.
+2. **Dinleyin:** Yüklendikten sonra 'Original Audio' kısmından orijinal kaydınızı dinleyebilirsiniz.
+3. **Filtreleri Ayarlayın:** Özel ihtiyaçlarınıza göre çeşitli ses filtrelerini açıp kapatabilirsiniz (Aşağıda detayları açıklanmıştır).
+4. **İşlemi Başlatın:** "Process Audio" butonuna bastığınızda yapay zeka devreye girer ve kısa bir süre içinde sesinizi temizler.
+5. **Sonucu Karşılaştırın & Kaydedin:** Temizlenen sesi 'Processed Audio' bölümünden dinleyebilir ve "Save" diyerek cihazınıza indirebilirsiniz.
+
+---
+
+### 2. Filtreler Ne İşe Yarar?
+
+Mevcut yapay zeka modeli seste oldukça iyi bir temizleme yapar. Ancak çıkan sesin *daha da pürüzsüz* duymasını istiyorsanız şu ek algoritmaları aktif edebilirsiniz:
+
+- **Spectral Gate:** Sesteki *statik gürültülerin* (ör. klima, fan, arka plan uğultusu) eşik değerini belirleyip sadece o frekansları susturur. Kısık sesleri arka plandan siler.
+- **Wiener Filter:** Ses sinyallerini tarar ve matematiskel olarak gürültü ihtimali olan yüksek frekanslı parazitleri sönümler. *(Wiener Size parametresi arttıkça temizleme agresifleşir ancak seste boğukluk yapabilir)*.
+- **Gaussian Blur:** Sesteki ani yırtılmaları veya çok sivri patlamaları yumuşatır. Sesi mikslemek için daha kadifemsi yapar *(Gaussian Sigma parametresi bu etkinin alanını belirler)*.
+
+> **Spektrogramları Göster (Show Spectrograms):** Seçtiğinizde grafik tablosuyla sesin frekans yapısını "Gürültülü" ve "Temizlenmiş" halini yan yana görmenizi sağlar.
+
+"""
+        guide_tab_content = ft.Container(
+            content=ft.Markdown(
+                guide_md,
+                selectable=True,
+                extension_set=ft.MarkdownExtensionSet.GITHUB_WEB,
+            ),
+            padding=20
+        )
+
+        # Assemble Tabs
+        tabs = ft.Tabs(
+            selected_index=0,
+            animation_duration=300,
+            tabs=[
+                ft.Tab(
+                    text="🎵 Ses Temizleme (Ana Sayfa)",
+                    content=main_tab_content,
+                ),
+                ft.Tab(
+                    text="📖 Nasıl Kullanılır?",
+                    content=guide_tab_content,
+                ),
+            ],
+            expand=True,
+        )
+
+        self.page.add(tabs)
+
+    def format_time(self, seconds):
+        if seconds is None:
+            return "0:00"
+        m, s = divmod(int(seconds), 60)
+        return f"{m}:{s:02d}"
 
     def _load_model(self):
         try:
             model_path = "model/nocle.hdf5"
             self.model_handler = ModelHandler(model_path, self.audio_processor)
-            self.status_var.set("Model loaded successfully")
+            self.status_text.value = "Model loaded successfully"
+            self.status_text.color = ft.colors.GREEN_400
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to load model: {str(e)}")
-            self.root.quit()
+            self.show_message(f"Failed to load model: {str(e)}", is_error=True)
+            self.status_text.value = "Failed to load model"
+            self.status_text.color = ft.colors.RED_400
+        self.page.update()
 
-    def _browse_file(self):
-        file_path = filedialog.askopenfilename(
-            filetypes=[("WAV files", "*.wav"), ("All files", "*.*")]
-        )
-        if file_path:
-            self.file_path_var.set(file_path)
+    def on_file_selected(self, e):
+        if e.files and len(e.files) > 0:
+            file_path = e.files[0].path
             self.current_audio_path = file_path
+            self.file_path_text.value = file_path
             
-            # Show original audio controls
-            self.playback_frame.grid()
+            try:
+                audio_data = self.audio_processor.get_audio(self.current_audio_path)
+                total_dur = int(len(audio_data) / 16000)
+                
+                self.original_time.value = f"0:00 / {self.format_time(total_dur)}"
+                self.original_play_btn.disabled = False
+                self.original_stop_btn.disabled = False
+                self.players_row.visible = True
+                
+                if self.show_spectrograms.value:
+                    self._update_spectrograms()
+                    
+                self.status_text.value = "Ready to process"
+                self.status_text.color = ft.colors.WHITE
+            except Exception as ex:
+                self.show_message(f"Could not load audio: {str(ex)}", is_error=True)
             
-            # Calculate total duration and update display
-            audio_data = self.audio_processor.get_audio(self.current_audio_path)
-            total_duration = int(len(audio_data) / 16000)  # Sample rate is 16000
-            self.original_time_label.config(text=f"0 / {total_duration}")
+            self.page.update()
 
-    def _process_audio(self):
+    def _process_audio(self, e):
         if not self.current_audio_path:
-            messagebox.showwarning("Warning", "Please select an audio file first")
+            self.show_message("Please select an audio file first", is_error=True)
             return
 
-        try:
-            self.status_var.set("Processing audio...")
-            self.progress_var.set(20)
-            self.root.update()
+        def process_task():
+            try:
+                self.status_text.value = "Processing audio..."
+                self.status_text.color = ft.colors.AMBER_400
+                self.progress_bar.visible = True
+                self.progress_bar.value = 0.2
+                self.page.update()
 
-            # Get filter parameters
-            filter_params = {
-                'wiener_size': int(self.wiener_size.get()),
-                'gaussian_sigma': float(self.gaussian_sigma.get())
-            }
+                filter_params = {
+                    'wiener_size': int(self.wiener_size.value),
+                    'gaussian_sigma': float(self.gaussian_sigma.value)
+                }
 
-            # Process audio
-            predicted_audio = self.model_handler.predict(self.current_audio_path)
-            self.progress_var.set(60)
-            self.root.update()
+                # Predict
+                predicted_audio = self.model_handler.predict(self.current_audio_path)
+                self.progress_bar.value = 0.6
+                self.page.update()
 
-            # Apply selected filters
-            if any([self.use_spectral_gate.get(), self.use_wiener.get(), self.use_gaussian.get()]):
-                predicted_audio = AudioFilters.apply_all_filters(
-                    predicted_audio,
-                    sr=16000,
-                    params=filter_params
-                )
+                # Filters
+                if any([self.use_spectral_gate.value, self.use_wiener.value, self.use_gaussian.value]):
+                    predicted_audio = AudioFilters.apply_all_filters(
+                        predicted_audio,
+                        sr=16000,
+                        params=filter_params
+                    )
 
-            self.progress_var.set(80)
-            self.root.update()
+                self.progress_bar.value = 0.9
+                self.page.update()
 
-            # Store processed audio and update UI
-            self.processed_audio = predicted_audio
-            
-            # Show processed audio controls
-            self.processed_frame.grid()
-            
-            # Update processed audio time label with total duration
-            total_duration = int(len(predicted_audio) / 16000)
-            self.processed_time_label.config(text=f"0 / {total_duration}")
-            
-            if self.show_spectrograms.get():
-                self._create_spectrogram_window()
+                self.processed_audio = predicted_audio
+                total_dur = int(len(predicted_audio) / 16000)
+                self.processed_time.value = f"0:00 / {self.format_time(total_dur)}"
+                
+                self.processed_play_btn.disabled = False
+                self.processed_stop_btn.disabled = False
+                self.save_btn.disabled = False
 
-            # Show save button for processed audio
-            self.status_var.set("Processing completed successfully")
-            
-            # Add save button to processed frame if not already added
-            if not hasattr(self, 'save_button'):
-                self.save_button = ttk.Button(self.processed_frame, text="Save", command=self._save_processed_audio)
-                self.save_button.grid(row=0, column=3, padx=2)
-            
-            self.progress_var.set(100)
+                if self.show_spectrograms.value:
+                    self._update_spectrograms()
 
-        except Exception as e:
-            messagebox.showerror("Error", f"Processing failed: {str(e)}")
-            self.status_var.set("Processing failed")
+                self.status_text.value = "Processing completed successfully"
+                self.status_text.color = ft.colors.GREEN_400
+                self.progress_bar.value = 1.0
+                self.show_message("Audio processed successfully!")
+
+            except Exception as ex:
+                self.show_message(f"Processing failed: {str(ex)}", is_error=True)
+                self.status_text.value = "Processing failed"
+                self.status_text.color = ft.colors.RED_400
+                
+            finally:
+                self.progress_bar.visible = False
+                self.page.update()
+
+        # Run process logic in a separate thread so it doesn't freeze UI
+        threading.Thread(target=process_task, daemon=True).start()
+
+    def _update_spectrograms(self):
+        self.spectrogram_container.controls.clear()
         
-        finally:
-            self.progress_var.set(0)
+        if self.current_audio_path:
+            audio_data = self.audio_processor.get_audio(self.current_audio_path)
+            b64_orig = self._create_spectrogram_base64(audio_data, "Original Audio Spectrogram")
+            self.spectrogram_container.controls.append(ft.Container(
+                 ft.Text("Original Audio Spectrogram", weight="bold"), padding=5))
+            self.spectrogram_container.controls.append(ft.Image(src_base64=b64_orig, expand=True, fit=ft.ImageFit.CONTAIN))
+            
+        if self.processed_audio is not None:
+            b64_proc = self._create_spectrogram_base64(self.processed_audio, "Processed Audio Spectrogram")
+            self.spectrogram_container.controls.append(ft.Container(
+                 ft.Text("Processed Audio Spectrogram", weight="bold"), padding=5))
+            self.spectrogram_container.controls.append(ft.Image(src_base64=b64_proc, expand=True, fit=ft.ImageFit.CONTAIN))
+            
+        self.spectrogram_container.visible = True
+        self.page.update()
 
-    def _plot_spectrogram(self, audio_data, ax, sr=16000):
-        """Plot spectrogram on the given axes"""
-        ax.clear()
+    def _create_spectrogram_base64(self, audio_data, title):
+        fig = Figure(figsize=(8, 3))
+        ax = fig.add_subplot(111)
         D = librosa.amplitude_to_db(np.abs(librosa.stft(audio_data)), ref=np.max)
         img = librosa.display.specshow(D, y_axis='log', x_axis='time', ax=ax)
-        ax.set_title('Spectrogram')
-        if ax == self.ax_original:
-            self.fig_original.colorbar(img, ax=ax, format="%+2.f dB")
-        else:
-            self.fig_processed.colorbar(img, ax=ax, format="%+2.f dB")
-
-    def _create_spectrogram_window(self):
-        """Create a new window for spectrograms"""
-        if self.spectrogram_window is None or not self.spectrogram_window.winfo_exists():
-            self.spectrogram_window = tk.Toplevel(self.root)
-            self.spectrogram_window.title("Audio Spectrograms")
-            self.spectrogram_window.geometry("1000x700")
-
-            # Create figures for spectrograms
-            self.fig_original = Figure(figsize=(8, 4))
-            self.ax_original = self.fig_original.add_subplot(111)
-            self.canvas_original = FigureCanvasTkAgg(self.fig_original, master=self.spectrogram_window)
-            self.canvas_original.get_tk_widget().pack(pady=10)
-            ttk.Label(self.spectrogram_window, text="Original Audio Spectrogram").pack()
-
-            self.fig_processed = Figure(figsize=(8, 4))
-            self.ax_processed = self.fig_processed.add_subplot(111)
-            self.canvas_processed = FigureCanvasTkAgg(self.fig_processed, master=self.spectrogram_window)
-            self.canvas_processed.get_tk_widget().pack(pady=10)
-            ttk.Label(self.spectrogram_window, text="Processed Audio Spectrogram").pack()
-
-            # Update original spectrogram if file is loaded
-            if self.current_audio_path:
-                self._update_original_spectrogram()
-
-            # Update processed spectrogram if available
-            if self.processed_audio is not None:
-                self._update_processed_spectrogram()
-
-    def _toggle_spectrograms(self):
-        """Handle spectrogram visibility"""
-        if self.show_spectrograms.get():
-            self._create_spectrogram_window()
-        else:
-            if self.spectrogram_window and self.spectrogram_window.winfo_exists():
-                self.spectrogram_window.destroy()
-                self.spectrogram_window = None
-
-    def _update_original_spectrogram(self):
-        """Update the original audio spectrogram"""
-        if self.current_audio_path and self.show_spectrograms.get():
-            if self.spectrogram_window is None or not self.spectrogram_window.winfo_exists():
-                self._create_spectrogram_window()
-            audio_data = self.audio_processor.get_audio(self.current_audio_path)
-            self._plot_spectrogram(audio_data, self.ax_original)
-            self.canvas_original.draw()
-
-    def _update_processed_spectrogram(self):
-        """Update the processed audio spectrogram"""
-        if self.processed_audio is not None and self.show_spectrograms.get():
-            if self.spectrogram_window is None or not self.spectrogram_window.winfo_exists():
-                self._create_spectrogram_window()
-            self._plot_spectrogram(self.processed_audio, self.ax_processed)
-            self.canvas_processed.draw()
+        fig.colorbar(img, ax=ax, format="%+2.f dB")
+        fig.tight_layout()
+        # To make it mix well with dark mode:
+        fig.patch.set_alpha(0.0)
+        ax.patch.set_alpha(0.0)
+        ax.xaxis.label.set_color('white')
+        ax.yaxis.label.set_color('white')
+        ax.tick_params(axis='x', colors='white')
+        ax.tick_params(axis='y', colors='white')
+        
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", transparent=True, bbox_inches="tight")
+        buf.seek(0)
+        img_b64 = base64.b64encode(buf.read()).decode()
+        return img_b64
 
     def _play_audio(self, audio_type):
-        """Play either original or processed audio"""
         if audio_type == 'original' and not self.current_audio_path:
-            messagebox.showwarning("Warning", "Please select an audio file first")
             return
         if audio_type == 'processed' and self.processed_audio is None:
-            messagebox.showwarning("Warning", "Please process an audio file first")
             return
 
-        self._stop_audio()  # Stop any currently playing audio
+        self._stop_audio()
+        self.is_playing = True
+        self.current_player = audio_type
         
         if audio_type == 'original':
             data, sr = sf.read(self.current_audio_path)
-            self.current_time_label = self.original_time_label
-        else:  # processed
+            self.current_time_label = 'original'
+        else:
             data = self.processed_audio
             sr = 16000
-            self.current_time_label = self.processed_time_label
+            self.current_time_label = 'processed'
             
-        # Calculate and store total duration
         self.total_duration = int(len(data) / sr)
-        
         self.audio_data = data
         self.sample_rate = sr
-        self.current_frame = 0  # Start from beginning
+        self.current_frame = 0
         
         def callback(outdata, frames, time, status):
             if status:
-                print(status)
+                pass
             if not self.is_playing:
                 raise sd.CallbackStop()
             
@@ -329,10 +415,6 @@ class NocleGUI:
                 outdata[:, 0] = chunk
                 self.current_frame += frames
         
-        self.is_playing = True
-        self.current_player = audio_type
-        
-        # Start audio stream
         self.stream = sd.OutputStream(
             samplerate=sr,
             channels=1,
@@ -341,119 +423,102 @@ class NocleGUI:
         )
         self.stream.start()
         
-        # Stop previous update thread if exists
         if hasattr(self, 'update_time_thread') and self.update_time_thread:
-            self.is_playing = False
             self.update_time_thread.join(timeout=1.0)
-        
-        # Start new time update thread
-        self.is_playing = True
+            
         self.update_time_thread = threading.Thread(target=self._update_time)
         self.update_time_thread.daemon = True
         self.update_time_thread.start()
 
+        # Update icons to indicate playing state
+        if audio_type == 'original':
+            self.original_play_btn.icon = ft.icons.PAUSE
+        else:
+            self.processed_play_btn.icon = ft.icons.PAUSE
+        self.page.update()
+
     def _stop_audio(self):
-        """Stop audio playback"""
-        # Stop playback first
         self.is_playing = False
         if self.stream is not None:
             self.stream.stop()
             self.stream.close()
             self.stream = None
         
-        # Wait for update thread to finish
         if hasattr(self, 'update_time_thread') and self.update_time_thread:
             self.update_time_thread.join(timeout=1.0)
             self.update_time_thread = None
-        
+            
         self.current_player = None
         
-        # Reset time display
+        self.original_play_btn.icon = ft.icons.PLAY_ARROW
+        self.processed_play_btn.icon = ft.icons.PLAY_ARROW
+        
+        # Reset labels
         if hasattr(self, 'current_time_label'):
-            self.root.after_idle(
-                lambda: self.current_time_label.config(text=f"0 / {self.total_duration}")
-            )
+            if self.current_time_label == 'original':
+                self.original_time.value = f"0:00 / {self.format_time(self.total_duration)}"
+            elif self.current_time_label == 'processed':
+                self.processed_time.value = f"0:00 / {self.format_time(self.total_duration)}"
+            self.page.update()
 
     def _on_playback_finished(self):
-        """Called when playback is finished"""
         self.is_playing = False
         self.current_player = None
-        self.stream = None
-        self.root.after(0, self._reset_slider)
+        if self.stream:
+            self.stream.stop()
+            self.stream.close()
+            self.stream = None
+            
+        self.original_play_btn.icon = ft.icons.PLAY_ARROW
+        self.processed_play_btn.icon = ft.icons.PLAY_ARROW
+            
+        if hasattr(self, 'current_time_label'):
+            if self.current_time_label == 'original':
+                self.original_time.value = f"0:00 / {self.format_time(self.total_duration)}"
+            elif self.current_time_label == 'processed':
+                self.processed_time.value = f"0:00 / {self.format_time(self.total_duration)}"
+            try:
+                self.page.update()
+            except Exception:
+                pass
 
-    def _reset_slider(self):
-        """Reset slider position when playback ends"""
-        if self.current_player == 'original':
-            self.original_slider.set(0)
-        else:
-            self.processed_slider.set(0)
 
     def _update_time(self):
-        """Update time display during playback"""
-        last_pos = -1  # Track last position to avoid unnecessary updates
-        
+        last_pos = -1
         while self.is_playing:
             try:
                 if self.audio_data is not None and hasattr(self, 'current_frame'):
                     current_pos = int(self.current_frame / self.sample_rate)
-                    
-                    # Only update if position changed
                     if current_pos != last_pos:
                         last_pos = current_pos
-                        # Update time label in the main thread
-                        self.root.after(10, lambda p=current_pos: 
-                            self.current_time_label.config(text=f"{p} / {self.total_duration}")
-                        )
-                
+                        formatted_current = self.format_time(current_pos)
+                        formatted_total = self.format_time(self.total_duration)
+                        if self.current_time_label == 'original':
+                            self.original_time.value = f"{formatted_current} / {formatted_total}"
+                        elif self.current_time_label == 'processed':
+                            self.processed_time.value = f"{formatted_current} / {formatted_total}"
+                        self.page.update()
                 time.sleep(0.1)
             except Exception as e:
-                print(f"Error updating time: {e}")
                 break
 
-    def _on_playback_finished(self):
-        """Called when playback is finished"""
-        self.is_playing = False
-        self.current_player = None
-        if self.stream is not None:
-            self.stream.stop()
-            self.stream.close()
-            self.stream = None
-        
-        # Reset time display
-        self.root.after_idle(
-            lambda: self.current_time_label.config(text="0")
-        )
-
-    def _save_processed_audio(self):
-        """Save the processed audio to a user-selected location"""
-        if self.processed_audio is None:
-            messagebox.showwarning("Warning", "No processed audio to save")
-            return
-            
-        output_path = filedialog.asksaveasfilename(
-            defaultextension=".wav",
-            filetypes=[("WAV files", "*.wav")],
-            initialfile="processed_audio.wav"
-        )
-        
-        if output_path:
-            self.audio_processor.save_audio(self.processed_audio, output_path)
-            messagebox.showinfo("Success", "Audio saved successfully")
+    def on_file_saved(self, e):
+        if e.path and self.processed_audio is not None:
+            output_path = e.path
+            if not output_path.endswith('.wav'):
+                output_path += '.wav'
+            try:
+                self.audio_processor.save_audio(self.processed_audio, output_path)
+                self.show_message("Audio saved successfully")
+            except Exception as ex:
+                self.show_message(f"Failed to save audio: {str(ex)}", is_error=True)
 
     def __del__(self):
-        """Cleanup when the application closes"""
-        self._stop_audio()  # Stop any playing audio
-        # Remove temporary file if it exists
-        if os.path.exists("temp_processed.wav"):
-            try:
-                os.remove("temp_processed.wav")
-            except:
-                pass
+        self._stop_audio()
 
-def main():
-    root = tk.Tk()
-    app = NocleGUI(root)
-    root.mainloop()
+
+def main(page: ft.Page):
+    app = NocleGUI(page)
 
 if __name__ == "__main__":
-    main()
+    ft.app(target=main)
