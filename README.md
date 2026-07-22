@@ -2,7 +2,7 @@
 
 Nocle (Noise Cleaner) is a desktop application powered by Deep Learning (TensorFlow) that removes background noise from audio files and real-time microphone streams. Built with a sleek, responsive HTML5/CSS3 interface powered by `pywebview`.
 
-![Nocle UI Preview](images/1.png)
+![Nocle UI Preview](images/image.png)
 
 ## ✨ Key Features
 
