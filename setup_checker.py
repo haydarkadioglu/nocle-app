@@ -1,0 +1,34 @@
+"""
+setup_checker.py — Detects missing system dependencies for Nocle.
+"""
+import sounddevice as sd
+
+
+def check_vb_cable() -> bool:
+    """Return True if VB-Audio Virtual Cable is detected as an audio device."""
+    try:
+        for d in sd.query_devices():
+            name = d['name'].upper()
+            if 'CABLE' in name or 'VB-AUDIO' in name:
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def get_missing_deps() -> list[dict]:
+    """Return a list of dicts describing each missing dependency."""
+    missing = []
+    if not check_vb_cable():
+        missing.append({
+            'id':          'vb_cable',
+            'name':        'VB-Audio Virtual Cable',
+            'description': 'Virtual microphone driver — lets the app output processed audio as a mic source for games and chat apps.',
+            'size':        '~3 MB',
+            'url':         'https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack43.zip',
+        })
+    return missing
+
+
+def all_deps_ok() -> bool:
+    return len(get_missing_deps()) == 0

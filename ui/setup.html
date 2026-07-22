@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nocle — Setup</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="setup.css" />
+</head>
+<body>
+  <div class="setup-wrap">
+
+    <!-- Logo -->
+    <div class="logo">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+      </svg>
+      <span>Nocle</span>
+    </div>
+
+    <h1>First-run setup</h1>
+    <p class="subtitle">The following components are required for real-time audio routing. Nocle will install them for you.</p>
+
+    <!-- Dependency list -->
+    <div class="dep-list" id="dep-list">
+      <!-- populated by JS -->
+    </div>
+
+    <!-- Install path -->
+    <div class="path-row" id="path-row">
+      <span class="path-label">Download folder</span>
+      <div class="path-input-wrap">
+        <input type="text" id="path-input" readonly />
+        <button class="btn-icon" id="btn-browse-path" title="Choose folder">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div class="progress-section" id="progress-section" style="display:none">
+      <div class="progress-bar"><div class="progress-fill" id="pfill"></div></div>
+      <span class="progress-msg" id="pmsg">Starting…</span>
+    </div>
+
+    <!-- Actions -->
+    <div class="actions">
+      <button class="btn-primary" id="btn-install">Install &amp; Continue</button>
+      <button class="btn-ghost" id="btn-skip" style="display:none">Skip (real-time unavailable)</button>
+      <button class="btn-primary" id="btn-launch" style="display:none">Launch Nocle →</button>
+    </div>
+
+    <!-- Note about UAC -->
+    <p class="uac-note" id="uac-note" style="display:none">
+      ⚠ A Windows security prompt will appear — click <strong>Yes</strong> to allow the driver installation.
+    </p>
+
+    <!-- Error / reboot messages -->
+    <div class="alert alert-error" id="msg-error" style="display:none"></div>
+    <div class="alert alert-warn"  id="msg-reboot" style="display:none">
+      Installation complete. A <strong>system reboot</strong> may be required before the virtual cable appears. Reboot and re-launch Nocle.
+    </div>
+
+  </div>
+  <script src="setup.js"></script>
+</body>
+</html>
