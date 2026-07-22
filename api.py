@@ -230,14 +230,50 @@ class Api:
     def get_audio_devices(self):
         try:
             devices = sd.query_devices()
+            default_in = sd.default.device[0]
+            default_out = sd.default.device[1]
+
             inputs = []
             outputs = []
             for idx, d in enumerate(devices):
+                # Filter out Sound Mapper wrappers for primary selection if desired, or include them
+                name = d['name']
+                is_default_in = (idx == default_in)
+                is_default_out = (idx == default_out)
+
                 if d['max_input_channels'] > 0:
-                    inputs.append({'index': idx, 'name': d['name']})
+                    inputs.append({'index': idx, 'name': name, 'is_default': is_default_in})
                 if d['max_output_channels'] > 0:
-                    outputs.append({'index': idx, 'name': d['name']})
-            return {'success': True, 'inputs': inputs, 'outputs': outputs}
+                    outputs.append({'index': idx, 'name': name, 'is_default': is_default_out})
+
+            # If default_in is Sound Mapper, try to pick the first hardware microphone
+            selected_input = default_in
+            if default_in >= 0 and default_in < len(devices) and 'Sound Mapper' in devices[default_in]['name']:
+                for item in inputs:
+                    if 'Sound Mapper' not in item['name'] and 'Primary' not in item['name']:
+                        selected_input = item['index']
+                        break
+
+            return {
+                'success': True,
+                'inputs': inputs,
+                'outputs': outputs,
+                'default_input': selected_input,
+                'default_output': default_out
+            }
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    def set_windows_default_mic(self, device_name="CABLE Output"):
+        """Set specified device as Windows default recording device using NirCmd."""
+        try:
+            nircmd_path = "nircmd.exe"
+            if not os.path.exists(nircmd_path):
+                return {'success': False, 'error': 'nircmd.exe not found'}
+
+            subprocess.run([nircmd_path, "setdefaultsounddevice", device_name, "1"], capture_output=True)
+            subprocess.run([nircmd_path, "setdefaultsounddevice", device_name, "2"], capture_output=True)
+            return {'success': True, 'device': device_name}
         except Exception as e:
             return {'success': False, 'error': str(e)}
 

@@ -16,6 +16,11 @@ def check_vb_cable() -> bool:
     return False
 
 
+def check_nircmd() -> bool:
+    """Return True if nircmd.exe exists in the project root."""
+    return os.path.exists("nircmd.exe")
+
+
 def get_missing_deps() -> list[dict]:
     """Return a list of dicts describing each missing dependency."""
     missing = []
@@ -27,8 +32,17 @@ def get_missing_deps() -> list[dict]:
             'size':        '~3 MB',
             'url':         'https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack43.zip',
         })
+    if not check_nircmd():
+        missing.append({
+            'id':          'nircmd',
+            'name':        'NirCmd Audio Helper',
+            'description': 'Utility to automatically set the virtual microphone as your Windows default recording device.',
+            'size':        '~120 KB',
+            'url':         'https://www.nirsoft.net/utils/nircmd-x64.zip',
+        })
     return missing
 
 
 def all_deps_ok() -> bool:
     return len(get_missing_deps()) == 0
+

@@ -247,6 +247,7 @@ const App = (() => {
       const opt = document.createElement('option');
       opt.value = d.index;
       opt.textContent = d.name;
+      if (d.index === res.default_input) opt.selected = true;
       selInput.appendChild(opt);
     });
 
@@ -257,6 +258,11 @@ const App = (() => {
       if (d.name.toUpperCase().includes('CABLE')) opt.selected = true;
       selOutput.appendChild(opt);
     });
+
+    // If default input wasn't explicitly selected, fall back to first non-mapper option
+    if (!selInput.value && selInput.options.length > 0) {
+      selInput.selectedIndex = 0;
+    }
   }
 
   btnToggleRt.addEventListener('click', async () => {
@@ -274,7 +280,17 @@ const App = (() => {
         btnToggleRt.textContent = 'Stop Live Mic';
         btnToggleRt.className = 'btn btn-primary';
         rtStatusDot.className = 'status-dot ready';
-        rtStatusText.textContent = 'Live mic active — routing audio';
+
+        if ($('rt-auto-default').checked) {
+          const defRes = await pywebview.api.set_windows_default_mic('CABLE Output');
+          if (defRes && defRes.success) {
+            rtStatusText.textContent = 'Live mic active — CABLE Output set as Windows default mic';
+          } else {
+            rtStatusText.textContent = 'Live mic active — routing audio (default mic switch failed)';
+          }
+        } else {
+          rtStatusText.textContent = 'Live mic active — routing audio';
+        }
       } else {
         rtStatusDot.className = 'status-dot error';
         rtStatusText.textContent = 'Failed to start live stream';
@@ -282,12 +298,18 @@ const App = (() => {
     } else {
       btnToggleRt.disabled = true;
       await pywebview.api.stop_realtime_mic();
+
+      if ($('rt-auto-default').checked && selInput.selectedIndex >= 0) {
+        const physName = selInput.options[selInput.selectedIndex].text;
+        await pywebview.api.set_windows_default_mic(physName);
+      }
+
       btnToggleRt.disabled = false;
       isRtRunning = false;
       btnToggleRt.textContent = 'Start Live Mic';
       btnToggleRt.className = 'btn btn-accent';
       rtStatusDot.className = 'status-dot';
-      rtStatusText.textContent = 'Live mic stopped';
+      rtStatusText.textContent = 'Live mic stopped (restored default mic)';
     }
   });
 

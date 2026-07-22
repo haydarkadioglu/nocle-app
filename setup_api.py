@@ -64,59 +64,76 @@ class SetupApi:
 
     def _install_task(self):
         try:
-            url      = 'https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack43.zip'
-            zip_path = os.path.join(self._install_path, 'VBCABLE.zip')
-            ext_path = os.path.join(self._install_path, 'VBCABLE')
-
-            # 1 — Download
-            self._status = 'downloading'
-            self._progress = 0.05
+            from setup_checker import check_vb_cable, check_nircmd
             os.makedirs(self._install_path, exist_ok=True)
 
-            def _hook(count, block, total):
-                if total > 0:
-                    self._progress = 0.05 + 0.50 * min(count * block / total, 1.0)
+            # 0 — NirCmd download if needed
+            if not check_nircmd():
+                self._status = 'downloading'
+                self._progress = 0.02
+                nir_url = 'https://www.nirsoft.net/utils/nircmd-x64.zip'
+                nir_zip = os.path.join(self._install_path, 'nircmd.zip')
+                urllib.request.urlretrieve(nir_url, nir_zip)
+                with zipfile.ZipFile(nir_zip, 'r') as z:
+                    z.extractall('.')
 
-            urllib.request.urlretrieve(url, zip_path, _hook)
+            # 1 — VB Cable download if needed
+            if not check_vb_cable():
+                url      = 'https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack43.zip'
+                zip_path = os.path.join(self._install_path, 'VBCABLE.zip')
+                ext_path = os.path.join(self._install_path, 'VBCABLE')
 
-            # 2 — Extract
-            self._status = 'extracting'
-            self._progress = 0.58
-            with zipfile.ZipFile(zip_path, 'r') as z:
-                z.extractall(ext_path)
-            self._progress = 0.65
+                self._status = 'downloading'
+                self._progress = 0.05
 
-            # 3 — Find installer
-            setup_exe = self._find_exe(ext_path)
-            if not setup_exe:
-                raise RuntimeError('Installer executable not found inside zip.')
+                def _hook(count, block, total):
+                    if total > 0:
+                        self._progress = 0.05 + 0.50 * min(count * block / total, 1.0)
 
-            # 4 — Run (UAC prompt will appear)
-            self._status = 'installing'
-            self._progress = 0.68
-            self.window.evaluate_js('Setup.onInstallerLaunched()')
-            ret = ctypes.windll.shell32.ShellExecuteW(None, 'runas', setup_exe, None, None, 1)
-            if ret <= 32:
-                raise RuntimeError(f'ShellExecute failed (code {ret}). Did you cancel the UAC prompt?')
+                urllib.request.urlretrieve(url, zip_path, _hook)
 
-            # 5 — Poll until device appears (max 60 s)
-            self._status = 'waiting'
-            for i in range(60):
-                time.sleep(1)
-                self._progress = min(0.68 + i * 0.005, 0.97)
-                try:
-                    for d in sd.query_devices():
-                        if 'CABLE' in d['name'].upper():
-                            self._progress = 1.0
-                            self._status = 'done'
-                            self.window.evaluate_js('Setup.onInstallDone()')
-                            return
-                except Exception:
-                    pass
+                # Extract
+                self._status = 'extracting'
+                self._progress = 0.58
+                with zipfile.ZipFile(zip_path, 'r') as z:
+                    z.extractall(ext_path)
+                self._progress = 0.65
 
-            # Device not found after 60 s → reboot probably needed
-            self._status = 'reboot_required'
-            self.window.evaluate_js('Setup.onRebootRequired()')
+                # Find installer
+                setup_exe = self._find_exe(ext_path)
+                if not setup_exe:
+                    raise RuntimeError('Installer executable not found inside zip.')
+
+                # Run (UAC prompt will appear)
+                self._status = 'installing'
+                self._progress = 0.68
+                self.window.evaluate_js('Setup.onInstallerLaunched()')
+                ret = ctypes.windll.shell32.ShellExecuteW(None, 'runas', setup_exe, None, None, 1)
+                if ret <= 32:
+                    raise RuntimeError(f'ShellExecute failed (code {ret}). Did you cancel the UAC prompt?')
+
+                # Poll until device appears (max 60 s)
+                self._status = 'waiting'
+                for i in range(60):
+                    time.sleep(1)
+                    self._progress = min(0.68 + i * 0.005, 0.97)
+                    try:
+                        for d in sd.query_devices():
+                            if 'CABLE' in d['name'].upper():
+                                self._progress = 1.0
+                                self._status = 'done'
+                                self.window.evaluate_js('Setup.onInstallDone()')
+                                return
+                    except Exception:
+                        pass
+
+                # Device not found after 60 s → reboot probably needed
+                self._status = 'reboot_required'
+                self.window.evaluate_js('Setup.onRebootRequired()')
+            else:
+                self._progress = 1.0
+                self._status = 'done'
+                self.window.evaluate_js('Setup.onInstallDone()')
 
         except Exception as exc:
             self._status = 'error'
