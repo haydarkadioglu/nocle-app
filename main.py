@@ -3,19 +3,16 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
 from model_download import download_model
-
-import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
-
-from model_download import download_model
 import setup_checker
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ICON_PATH = os.path.join(BASE_DIR, 'icon.png')
 
 def launch_main_app():
     import webview
     from api import Api
 
-    ui_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ui', 'index.html')
+    ui_path = os.path.join(BASE_DIR, 'ui', 'index.html')
     api = Api()
 
     window = webview.create_window(
@@ -34,7 +31,7 @@ def launch_setup():
     import webview
     from setup_api import SetupApi
 
-    setup_ui_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ui', 'setup.html')
+    setup_ui_path = os.path.join(BASE_DIR, 'ui', 'setup.html')
     setup_api = SetupApi(on_done_callback=launch_main_app)
 
     window = webview.create_window(
