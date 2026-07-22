@@ -277,6 +277,21 @@ class Api:
         except Exception as e:
             return {'success': False, 'error': str(e)}
 
+    def seek_audio(self, target_percent):
+        """Seek playback to target percentage (0.0 to 1.0)."""
+        if self.audio_data is not None and self.total_duration > 0:
+            target_frame = int(float(target_percent) * len(self.audio_data))
+            self.current_frame = max(0, min(target_frame, len(self.audio_data) - 1))
+            pos = self.current_frame / self.sample_rate
+            try:
+                self.window.evaluate_js(
+                    f'App.onTimeUpdate({pos:.2f}, {self.total_duration:.2f}, "{self.current_player}")'
+                )
+            except Exception:
+                pass
+            return {"success": True, "pos": pos}
+        return {"success": False}
+
     def start_realtime_mic(self, input_idx, output_idx, buffer_size=4096):
         if hasattr(self, '_rt_running') and self._rt_running:
             self.stop_realtime_mic()
@@ -286,25 +301,38 @@ class Api:
 
         def rt_thread():
             try:
+                last_vu = 0
                 def callback(indata, outdata, frames, time_info, status):
+                    nonlocal last_vu
                     if not self._rt_running:
                         raise sd.CallbackStop()
 
                     audio_chunk = indata[:, 0]
+                    # Compute peak volume for live VU meter
+                    peak = float(np.max(np.abs(audio_chunk))) if len(audio_chunk) > 0 else 0.0
+
                     # Apply noise reduction model / filters if loaded
                     if self.model_handler:
                         try:
-                            # Preprocess chunk to target batch size expected by model if needed
                             if len(audio_chunk) == 12000:
                                 processed = self.model_handler.predict_batch(audio_chunk)
                             else:
-                                processed = audio_chunk # Fallback to pass-through if mismatch
+                                processed = audio_chunk
                         except Exception:
                             processed = audio_chunk
                     else:
                         processed = audio_chunk
 
                     outdata[:, 0] = processed
+
+                    # Send VU peak to frontend (throttled)
+                    now_ms = time.time()
+                    if now_ms - last_vu > 0.08:
+                        last_vu = now_ms
+                        try:
+                            self.window.evaluate_js(f'App.onRealtimeVu({peak:.3f})')
+                        except Exception:
+                            pass
 
                 self._rt_stream = sd.Stream(
                     device=(int(input_idx), int(output_idx)),

@@ -227,6 +227,83 @@ const App = (() => {
     el.addEventListener('blur',   saveSettings);
   });
 
+  // ── Presets ──────────────────────────────────────────────────────
+  const PRESETS = {
+    custom:     null,
+    voice:      { 'f-spectral': true,  'f-wiener': false, 'f-gaussian': false, 'f-normalize': true,  'p-wiener': 15, 'p-sigma': 2.0 },
+    wind:       { 'f-spectral': true,  'f-wiener': true,  'f-gaussian': true,  'f-normalize': true,  'p-wiener': 15, 'p-sigma': 2.0 },
+    ai_only:    { 'f-spectral': false, 'f-wiener': false, 'f-gaussian': false, 'f-normalize': true,  'p-wiener': 15, 'p-sigma': 2.0 },
+    aggressive: { 'f-spectral': true,  'f-wiener': true,  'f-gaussian': true,  'f-normalize': true,  'p-wiener': 21, 'p-sigma': 3.0 },
+  };
+
+  $('f-preset').addEventListener('change', (e) => {
+    const val = e.target.value;
+    const p = PRESETS[val];
+    if (p) {
+      applySettings(p);
+      saveSettings();
+    }
+  });
+
+  // ── Drag and Drop File Support ────────────────────────────────────
+  const fileCard = $('file-info').closest('.card');
+
+  ['dragenter', 'dragover'].forEach(eventName => {
+    fileCard.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      fileCard.classList.add('drag-over');
+    }, false);
+  });
+
+  ['dragleave', 'drop'].forEach(eventName => {
+    fileCard.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      fileCard.classList.remove('drag-over');
+    }, false);
+  });
+
+  fileCard.addEventListener('drop', async (e) => {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    if (files && files.length > 0) {
+      const path = files[0].path;
+      if (path) {
+        const r = await pywebview.api.get_audio_info(path);
+        if (r && r.success) {
+          fileDuration = r.duration;
+          fileInfo.innerHTML = `
+            <div class="file-name">${r.filename}</div>
+            <div class="file-meta">${fmt(r.duration)} &nbsp;·&nbsp; 16 kHz mono</div>`;
+          $('time-orig').textContent = `0:00 / ${fmt(fileDuration)}`;
+          $('tl-orig').style.width = '0%';
+          players.style.display = 'flex';
+          btnProcess.disabled = false;
+          setStatus('File loaded — ready to process', 'ready');
+        }
+      }
+    }
+  });
+
+  // ── Clickable Seek Timelines ──────────────────────────────────────
+  document.querySelectorAll('.timeline').forEach(tl => {
+    tl.addEventListener('click', async (e) => {
+      const rect = tl.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+      await pywebview.api.seek_audio(ratio);
+    });
+  });
+
+  // ── Live VU Meter callback ───────────────────────────────────────
+  function onRealtimeVu(peak) {
+    const vuFill = $('rt-vu-fill');
+    const vuText = $('rt-vu-text');
+    if (!vuFill || !vuText) return;
+    const pct = Math.min(100, Math.round(peak * 250));
+    vuFill.style.width = pct + '%';
+    vuText.textContent = pct + '%';
+  }
+
   // ── Real-Time Mic Controls ──────────────────────────────────────────
   let isRtRunning = false;
   const btnToggleRt  = $('btn-toggle-rt');
@@ -310,6 +387,7 @@ const App = (() => {
       btnToggleRt.className = 'btn btn-accent';
       rtStatusDot.className = 'status-dot';
       rtStatusText.textContent = 'Live mic stopped (restored default mic)';
+      onRealtimeVu(0);
     }
   });
 
@@ -319,6 +397,7 @@ const App = (() => {
     btnToggleRt.className = 'btn btn-accent';
     rtStatusDot.className = 'status-dot error';
     rtStatusText.textContent = 'Error: ' + msg;
+    onRealtimeVu(0);
   }
 
   // ── Boot ─────────────────────────────────────────────────────────
@@ -341,6 +420,6 @@ const App = (() => {
   window.addEventListener('pywebviewready', boot);
 
   // Expose callbacks for Python → JS calls
-  return { onProcessingDone, onProcessingError, onTimeUpdate, onPlaybackFinished, setSpectrogram, onRealtimeError };
+  return { onProcessingDone, onProcessingError, onTimeUpdate, onPlaybackFinished, setSpectrogram, onRealtimeError, onRealtimeVu };
 })();
 

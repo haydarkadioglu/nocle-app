@@ -37,6 +37,15 @@
 
     <!-- Filters (only visible on main tab) -->
     <div class="filters" id="filters">
+      <p class="section-label">Presets</p>
+      <select id="f-preset" class="select-input" style="width:100%;margin-bottom:14px">
+        <option value="custom">⚙️ Custom</option>
+        <option value="voice">🎙️ Voice / Podcast</option>
+        <option value="wind">HVAC & Fan Noise</option>
+        <option value="ai_only">✨ AI Clean Only</option>
+        <option value="aggressive">🧼 Aggressive Denoise</option>
+      </select>
+
       <p class="section-label">Filters</p>
 
       <label class="toggle-row">
@@ -198,6 +207,14 @@
               <input type="checkbox" id="rt-auto-default" checked />
               <span class="toggle"></span>
             </label>
+          </div>
+
+          <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px">
+              <span>Live Mic Level</span>
+              <span id="rt-vu-text">0%</span>
+            </div>
+            <div class="vu-bar"><div class="vu-fill" id="rt-vu-fill" style="width:0%"></div></div>
           </div>
         </div>
 
