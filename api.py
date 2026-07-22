@@ -169,6 +169,27 @@ class Api:
         self._update_thread.start()
         return {"success": True, "duration": self.total_duration}
 
+    def swap_audio_player(self):
+        """Seamlessly swap playback between original and processed audio at current position."""
+        if not self.is_playing or not self.current_player:
+            # If not playing, start playing processed if available, otherwise original
+            if self.processed_audio is not None:
+                return self.play_audio("processed")
+            elif self.current_audio_path:
+                return self.play_audio("original")
+            return {"success": False}
+
+        new_target = "processed" if self.current_player == "original" else "original"
+        if new_target == "processed" and self.processed_audio is None:
+            return {"success": False, "error": "No processed audio"}
+        if new_target == "original" and not self.current_audio_path:
+            return {"success": False, "error": "No original audio"}
+
+        cur_frame = self.current_frame
+        res = self.play_audio(new_target)
+        self.current_frame = min(cur_frame, len(self.audio_data) - 1)
+        return {"success": True, "player": new_target}
+
     def stop_audio(self):
         self.is_playing = False
         if self.stream:

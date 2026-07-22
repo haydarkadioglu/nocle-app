@@ -198,6 +198,61 @@ const App = (() => {
   setupPlayer($('play-orig'), $('stop-orig'), 'original');
   setupPlayer($('play-proc'), $('stop-proc'), 'processed');
 
+  // ── A/B Swap ──────────────────────────────────────────────────────
+  const btnAbSwap = $('btn-ab-swap');
+  if (btnAbSwap) {
+    btnAbSwap.addEventListener('click', async () => {
+      const res = await pywebview.api.swap_audio_player();
+      if (res && res.success) {
+        if (res.player === 'processed') {
+          resetPlayerIcon('original');
+          $('play-proc').querySelector('svg').innerHTML =
+            '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
+          activePlayer = 'processed';
+        } else if (res.player === 'original') {
+          resetPlayerIcon('processed');
+          $('play-orig').querySelector('svg').innerHTML =
+            '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
+          activePlayer = 'original';
+        }
+      }
+    });
+  }
+
+  // ── Keyboard Shortcuts ───────────────────────────────────────────
+  window.addEventListener('keydown', (e) => {
+    // Ignore key shortcuts if focused inside an input or select
+    const activeEl = document.activeElement;
+    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'SELECT')) {
+      return;
+    }
+
+    if (e.code === 'Space') {
+      e.preventDefault();
+      if (activePlayer) {
+        pywebview.api.stop_audio();
+        resetPlayerIcon(activePlayer);
+        activePlayer = null;
+      } else if (procDuration > 0) {
+        $('play-proc').click();
+      } else if (fileDuration > 0) {
+        $('play-orig').click();
+      }
+    } else if (e.code === 'KeyA') {
+      e.preventDefault();
+      if (btnAbSwap) btnAbSwap.click();
+    } else if (e.code === 'KeyM') {
+      e.preventDefault();
+      btnToggleRt.click();
+    } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyO') {
+      e.preventDefault();
+      btnBrowse.click();
+    } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyS') {
+      e.preventDefault();
+      if (!btnSave.disabled) btnSave.click();
+    }
+  });
+
   // ── Save ─────────────────────────────────────────────────────────
   btnSave.addEventListener('click', async () => {
     btnSave.disabled = true;
