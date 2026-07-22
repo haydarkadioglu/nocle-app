@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nocle — Audio Enhancer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="logo">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+      </svg>
+      <span>Nocle</span>
+    </div>
+
+    <nav class="nav">
+      <button class="nav-btn active" data-tab="main">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+        Enhance
+      </button>
+      <button class="nav-btn" data-tab="guide">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Guide
+      </button>
+    </nav>
+
+    <!-- Filters (only visible on main tab) -->
+    <div class="filters" id="filters">
+      <p class="section-label">Filters</p>
+
+      <label class="toggle-row">
+        <span>Spectral Gate</span>
+        <input type="checkbox" id="f-spectral" />
+        <span class="toggle"></span>
+      </label>
+      <label class="toggle-row">
+        <span>Wiener Filter</span>
+        <input type="checkbox" id="f-wiener" />
+        <span class="toggle"></span>
+      </label>
+      <label class="toggle-row">
+        <span>Gaussian Blur</span>
+        <input type="checkbox" id="f-gaussian" />
+        <span class="toggle"></span>
+      </label>
+      <label class="toggle-row">
+        <span>Normalize Output</span>
+        <input type="checkbox" id="f-normalize" checked />
+        <span class="toggle"></span>
+      </label>
+      <label class="toggle-row">
+        <span>Show Spectrograms</span>
+        <input type="checkbox" id="f-spectrograms" />
+        <span class="toggle"></span>
+      </label>
+
+      <p class="section-label" style="margin-top:20px">Parameters</p>
+
+      <div class="param-row">
+        <label for="p-wiener">Wiener Size</label>
+        <input type="number" id="p-wiener" value="15" min="3" max="31" step="2" />
+      </div>
+      <div class="param-row">
+        <label for="p-sigma">Gaussian Sigma</label>
+        <input type="number" id="p-sigma" value="2.0" min="0.1" max="5.0" step="0.1" />
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="main">
+
+    <!-- TAB: Enhance -->
+    <section class="tab active" id="tab-main">
+
+      <!-- Status bar -->
+      <div class="status-bar" id="status-bar">
+        <span class="status-dot" id="status-dot"></span>
+        <span id="status-text">Loading model…</span>
+      </div>
+
+      <!-- File card -->
+      <div class="card">
+        <div class="card-header">
+          <span>Audio File</span>
+          <button class="btn btn-primary" id="btn-browse">Browse</button>
+        </div>
+        <div class="file-info" id="file-info">
+          <span class="placeholder">No file selected — supported formats: wav, mp3, flac, ogg, aac, m4a</span>
+        </div>
+      </div>
+
+      <!-- Process card -->
+      <div class="card">
+        <div class="card-header">
+          <span>Processing</span>
+          <button class="btn btn-accent" id="btn-process" disabled>Process</button>
+        </div>
+        <div class="progress-wrap" id="progress-wrap" style="display:none">
+          <div class="progress-bar">
+            <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+          </div>
+          <span class="progress-label" id="progress-label">0%</span>
+        </div>
+      </div>
+
+      <!-- Players -->
+      <div class="players" id="players" style="display:none">
+        <!-- Original -->
+        <div class="card player-card">
+          <p class="player-title">Original</p>
+          <div class="player-controls">
+            <button class="icon-btn" id="play-orig" title="Play">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            </button>
+            <button class="icon-btn" id="stop-orig" title="Stop">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+            </button>
+            <div class="timeline">
+              <div class="timeline-fill" id="tl-orig"></div>
+            </div>
+            <span class="time-display" id="time-orig">0:00 / 0:00</span>
+          </div>
+        </div>
+
+        <!-- Processed -->
+        <div class="card player-card" id="processed-player" style="opacity:.4;pointer-events:none">
+          <p class="player-title">Processed</p>
+          <div class="player-controls">
+            <button class="icon-btn" id="play-proc" title="Play">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            </button>
+            <button class="icon-btn" id="stop-proc" title="Stop">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+            </button>
+            <div class="timeline">
+              <div class="timeline-fill" id="tl-proc"></div>
+            </div>
+            <span class="time-display" id="time-proc">0:00 / 0:00</span>
+            <button class="btn btn-sm" id="btn-save" style="margin-left:8px">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Spectrograms -->
+      <div id="spectrograms" style="display:none">
+        <div class="card">
+          <p class="player-title">Spectrograms</p>
+          <img id="spec-original" class="spectrogram" alt="Original spectrogram" style="display:none" />
+          <img id="spec-processed" class="spectrogram" alt="Processed spectrogram" style="display:none" />
+        </div>
+      </div>
+
+    </section>
+
+    <!-- TAB: Guide -->
+    <section class="tab" id="tab-guide">
+      <div class="guide">
+        <h1>How to use Nocle</h1>
+        <p>Nocle uses a deep learning model to remove background noise from audio recordings. Follow the steps below to clean up your files.</p>
+
+        <h2>Steps</h2>
+        <ol>
+          <li><strong>Browse</strong> — click the Browse button and select a <code>.wav</code>, <code>.mp3</code>, <code>.flac</code>, <code>.ogg</code>, <code>.aac</code> or <code>.m4a</code> file.</li>
+          <li><strong>Configure filters</strong> — optionally enable one or more filters in the sidebar.</li>
+          <li><strong>Process</strong> — click Process and wait. Progress is shown in real time.</li>
+          <li><strong>Compare</strong> — play back both the original and processed versions using the player cards.</li>
+          <li><strong>Save</strong> — when satisfied, click Save to export the cleaned audio as a <code>.wav</code> file.</li>
+        </ol>
+
+        <h2>Filters</h2>
+        <dl>
+          <dt>Spectral Gate</dt>
+          <dd>Suppresses static background noise (fans, air conditioning) by attenuating frequencies below a dynamic threshold.</dd>
+
+          <dt>Wiener Filter</dt>
+          <dd>A mathematical filter that estimates and reduces random noise across the frequency spectrum. Increase <em>Wiener Size</em> for stronger reduction (may cause muddiness).</dd>
+
+          <dt>Gaussian Blur</dt>
+          <dd>Smooths sharp transients and click-like artefacts. <em>Gaussian Sigma</em> controls the smoothing radius.</dd>
+
+          <dt>Normalize Output</dt>
+          <dd>Scales the processed audio so its peak level is −3 dBFS, preventing the result from being too quiet or too loud.</dd>
+        </dl>
+
+        <h2>Tips</h2>
+        <ul>
+          <li>The AI model alone is often sufficient — try it without any filters first.</li>
+          <li>Enable <em>Show Spectrograms</em> to see a frequency-domain view of the before and after.</li>
+          <li>Your filter settings are saved automatically and restored on next launch.</li>
+        </ul>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
