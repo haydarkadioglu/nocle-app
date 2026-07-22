@@ -10,16 +10,7 @@ class AudioProcessor:
 
     def get_audio_in_batches(self, path, batching_size=12000):
         """Load and process audio file in batches"""
-        audio, sample_rate = tf.audio.decode_wav(
-            tf.io.read_file(path), desired_channels=1)
-        audio_np = audio.numpy().squeeze()
-
-        if sample_rate != self.target_sample_rate:
-            audio_np = librosa.resample(
-                audio_np, 
-                orig_sr=sample_rate.numpy(), 
-                target_sr=self.target_sample_rate
-            )
+        audio_np, _ = librosa.load(path, sr=self.target_sample_rate)
 
         audio_batches = []
         total_samples = len(audio_np)
@@ -34,18 +25,12 @@ class AudioProcessor:
 
     def get_audio(self, path):
         """Load complete audio file"""
-        audio, sample_rate = tf.audio.decode_wav(
-            tf.io.read_file(path), desired_channels=1)
-        audio_np = audio.numpy().squeeze()
-
-        if sample_rate != self.target_sample_rate:
-            audio_np = librosa.resample(
-                audio_np, 
-                orig_sr=sample_rate.numpy(), 
-                target_sr=self.target_sample_rate
-            )
-
+        audio_np, _ = librosa.load(path, sr=self.target_sample_rate)
         return audio_np
+
+    def normalize_audio(self, audio_data):
+        """Normalize audio data to -1 to 1 range"""
+        return librosa.util.normalize(audio_data)
 
     def save_audio(self, audio_data, output_path):
         """Save audio data to file"""
