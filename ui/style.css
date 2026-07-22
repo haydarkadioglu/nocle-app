@@ -336,3 +336,26 @@ body { display: flex; height: 100vh; }
 }
 .guide strong { color: var(--text); }
 .guide em { color: var(--text); font-style: normal; font-weight: 500; }
+
+/* ── Color Palette Switcher ───────────────────────────────────────── */
+.color-picker {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.color-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 120ms, border-color 120ms;
+}
+.color-dot:hover {
+  transform: scale(1.2);
+}
+.color-dot.active {
+  border-color: var(--text);
+  transform: scale(1.15);
+}

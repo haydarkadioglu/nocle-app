@@ -7,3 +7,4 @@ env/
 test_flet.py
 test_flet2.py
 docs/
+settings.json

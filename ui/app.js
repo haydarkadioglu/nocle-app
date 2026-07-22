@@ -53,17 +53,58 @@ const App = (() => {
   function applySettings(s) {
     FILTER_IDS.forEach(id => { if (id in s) $(id).checked = s[id]; });
     PARAM_IDS.forEach(id  => { if (id in s) $(id).value  = s[id]; });
+    if (s.accent_color) setAccentColor(s.accent_color);
   }
 
   function collectSettings() {
     const s = {};
     FILTER_IDS.forEach(id => s[id] = $(id).checked);
     PARAM_IDS.forEach(id  => s[id] = $(id).value);
+    const activeDot = document.querySelector('.color-dot.active');
+    if (activeDot) s.accent_color = activeDot.dataset.color;
     return s;
   }
 
   function saveSettings() {
     pywebview.api.save_settings(collectSettings());
+  }
+
+  // ── Accent Theme Switcher ───────────────────────────────────────
+  const COLOR_HOVERS = {
+    '#6366f1': '#4f46e5',
+    '#06b6d4': '#0891b2',
+    '#10b981': '#059669',
+    '#f43f5e': '#e11d48',
+    '#f59e0b': '#d97706',
+  };
+
+  function setAccentColor(color) {
+    document.documentElement.style.setProperty('--accent', color);
+    const hoverColor = COLOR_HOVERS[color] || color;
+    document.documentElement.style.setProperty('--accent-h', hoverColor);
+
+    document.querySelectorAll('.color-dot').forEach(dot => {
+      dot.classList.toggle('active', dot.dataset.color === color);
+    });
+  }
+
+  document.querySelectorAll('.color-dot').forEach(dot => {
+    dot.addEventListener('click', () => {
+      const color = dot.dataset.color;
+      setAccentColor(color);
+      saveSettings();
+    });
+  });
+
+  // ── Gain Boost Slider ───────────────────────────────────────────
+  const pGain = $('p-gain');
+  const pGainVal = $('p-gain-val');
+  if (pGain) {
+    pGain.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value).toFixed(1);
+      pGainVal.textContent = val + 'x';
+      pywebview.api.set_playback_gain(val);
+    });
   }
 
   // ── Tab navigation ───────────────────────────────────────────────
