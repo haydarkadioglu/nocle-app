@@ -1,149 +1,104 @@
-# Nocle - AI-Powered Audio Noise Reduction App
+# Nocle — AI-Powered Audio Noise Reduction & Real-Time Mic App
 
-Nocle (Noise Cleaner) is a desktop application that uses artificial intelligence to reduce background noise in audio recordings. It provides a modern, sleek, and user-friendly interface for cleaning up your audio files.
+Nocle (Noise Cleaner) is a desktop application powered by Deep Learning (TensorFlow) that removes background noise from audio files and real-time microphone streams. Built with a sleek, responsive HTML5/CSS3 interface powered by `pywebview`.
 
-![Main](images/1.png)
+![Nocle UI Preview](images/1.png)
 
-## Features
+## ✨ Key Features
 
-- **Modern & Beautiful UI:** Redesigned with Flet, featuring a Dark Mode out of the box and an intuitive tab-based layout.
-- **Built-in Guide:** Explanations of how filters and the model works directly inside the "Nasıl Kullanılır" (Guide) tab.
-- **AI-powered noise reduction:** Deep learning models working behind the scenes.
-- **Real-time audio playback:** Play, stop, and compare original vs. processed audio instantly.
-- **Multiple audio filtering options:** Spectral Gate, Wiener Filter, and Gaussian Blur.
-- **Spectrogram visualization:** Crisp SVG-based spectrogram charts comparing audio frequency data.
-- **WAV file support.**
+- **🎨 Modern Dark Mode UI:** Built with HTML5, CSS3, and JavaScript via `pywebview` for maximum responsiveness and visual excellence.
+- **🎙️ Live Mic Real-Time Denoising:** Process live microphone input in real time and route clean audio to games, Discord, Zoom, or OBS via virtual audio cable.
+- **🔊 Auto-set Default Microphone:** Automatically sets the virtual microphone as your Windows Default Recording Device on live stream start, and restores your physical microphone on stop.
+- **📊 Live VU Level Meter:** Real-time visual audio peak meter displaying live volume levels.
+- **🎛️ Filter Presets:** Quick 1-click filter presets (*Voice/Podcast*, *HVAC & Fan Noise*, *AI Clean Only*, *Aggressive Denoise*).
+- **📁 Multi-Format Audio Support:** Supports `.wav`, `.mp3`, `.flac`, `.ogg`, `.aac`, and `.m4a` files via `librosa`.
+- **🖱️ Drag & Drop:** Drop audio files directly into the app window.
+- **⏩ Interactive Timeline Seeking:** Click anywhere on the playback timeline to jump instantly to any timestamp.
+- **🧙 Automatic Setup Wizard:** Automatically detects missing drivers (like VB-Audio Cable) and installs them on first launch.
+- **📖 Built-in Guide:** Explanations of filters and model workings directly inside the "Guide" tab.
 
-## Installation
+---
 
-1. Make sure you have Python 3.10 or later installed
-2. Clone this repository:
-```bash
-git clone https://github.com/haydarkadioglu/nocle-app.git
-```
-3. Create a virtual environment:
-```bash
-cd nocle-app
-python -m venv .venv
-```
-4. Activate the virtual environment:
-   - Windows:
+## 🛠️ Installation
+
+1. **Requirements:** Python 3.10 or later installed on Windows or Linux.
+2. **Clone the repository:**
    ```bash
-   .venv\Scripts\activate
+   git clone https://github.com/haydarkadioglu/nocle-app.git
+   cd nocle-app
    ```
-   - Linux/Mac:
+3. **Create & activate a virtual environment:**
+   - **Windows (PowerShell):**
+     ```powershell
+     python -m venv .venv
+     .venv\Scripts\activate
+     ```
+   - **Linux / macOS:**
+     ```bash
+     python3 -m venv .venv
+     source .venv/bin/activate
+     ```
+4. **Install dependencies:**
    ```bash
-   source .venv/bin/activate
+   pip install -r requirements.txt
    ```
-5. Install required packages:
-```bash
-pip install -r requirements.txt
-```
 
-## How to Use
+---
 
-1. Launch the application:
+## 🚀 How to Use
+
+Launch the application:
 ```bash
 python main.py
 ```
 
-2. **Select Audio File**
-   - Click the "Browse" button to select your WAV audio file
-   - The original audio controls will appear
+### 1. Enhance Audio Files
+1. Drag and drop or click **Browse** to choose an audio file (`.mp3`, `.wav`, `.flac`, `.ogg`, etc.).
+2. Select a **Filter Preset** or customize individual filters (*Spectral Gate*, *Wiener Filter*, *Gaussian Blur*, *Normalize*).
+3. Click **Process** and monitor progress in real time.
+4. Compare original vs. processed audio with interactive seekable players.
+5. Click **Save** to export the cleaned audio as a `.wav` file.
 
+### 2. Live Mic (Real-Time Mode)
+1. Navigate to the **Live Mic** tab.
+2. Select your **Input Microphone** and **Output Device** (VB-Cable).
+3. Choose your preferred latency buffer size (*Low Latency ~128ms*, *Balanced ~256ms*, *High Quality ~512ms*).
+4. Click **Start Live Mic**. Your Windows default recording device will automatically switch to the cleaned virtual microphone!
+5. Select **CABLE Output** in Discord, games, or streaming apps.
 
-3. **Choose Filtering Options**
-   - Spectral Gate: Reduces background noise
-   - Wiener Filter: Reduces general noise
-   - Gaussian Blur: Smooths audio signal
-   - Adjust filter parameters as needed
+---
 
+## 🏗️ Architecture & Technology Stack
 
-4. **Process Audio**
-   - Click "Process Audio" button
-   - Wait for the processing to complete
-   - New controls for the processed audio will appear
+- **GUI / Window Engine:** `pywebview`
+- **Frontend:** Vanilla HTML5, CSS3 (CSS Variables, Flexbox, Inter Font), Vanilla JS
+- **Audio Processing Engine:** Librosa, SciPy, SoundFile, SoundDevice
+- **AI Denoising Model:** TensorFlow 2.x U-Net / GAN architecture (`nocle.hdf5`)
+- **System Helper:** NirCmd for automatic Windows default audio endpoint switching
 
-5. **Compare and Save**
-   - Play both original and processed audio to compare
-   - View spectrograms if enabled
-   - Click "Save" to save the processed audio
+---
 
-![Spectogram](images/2.png)
+## 🤝 Contributing
 
-## Understanding the Interface
+Contributions, issues, and feature requests are welcome!
+1. Fork the project
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-### Navigation Tabs
-- **🎵 Ses Temizleme (Main Tab)**: The main workspace for importing, processing, and exporting audio files.
-- **📖 Nasıl Kullanılır? (Guide Tab)**: A built-in manual explaining step-by-step usage and deep-dives into what each filter does.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
 
-### Main Controls
-- **File Selection**: Select input audio files (`.wav`).
-- **Filter Options**: Switch filters on/off and set numeric parameters inside the interactive card.
-- **Audio Controls**: Interactive playback controls for both original and enhanced audio.
-- **Progress Bar & Status Messages**: Dynamic indicators for processing tasks.
+---
 
-### Filter Parameters
-- **Wiener Size**: Controls the strength of the Wiener filter (3-31)
-- **Gaussian Sigma**: Adjusts the smoothing effect (0.1-5.0)
+## 📄 License
 
-## Audio Playback
-- Play/Stop buttons for both original and processed audio
-- Real-time playback time display
-- Independent controls for comparing audio files
+Distributed under the GNU General Public License v3.0. See `LICENSE` for more information.
 
-## Model Information
+---
 
-The application uses a custom-trained deep learning model for noise reduction:
-- Model file: `nocle.hdf5`
-- Input: Noisy WAV audio
-- Output: Clean audio with reduced noise
-- Sample rate: 16000 Hz
+## 👤 Author
 
-## Troubleshooting
-
-### Common Issues
-
-1. **Application won't start**
-   - Check if Python 3.10+ is installed
-   - Verify all dependencies are installed
-   - Make sure virtual environment is activated
-
-2. **Can't load audio file**
-   - Ensure file is in WAV format
-   - Check file permissions
-   - Verify file isn't corrupted
-
-3. **Processing fails**
-   - Check if model file exists in model/ directory
-   - Ensure enough system memory is available
-   - Verify audio file is valid
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
-## License
-
-This project is licensed under the GNU License - see the LICENSE file for details.
-
-## Authors
-
-### Lead Developer
-- **Haydar Kadıoğlu**
-  - GitHub: [@haydarkadioglu](https://github.com/haydarkadioglu)
-  - LinkedIn: [Haydar Kadıoğlu](https://www.linkedin.com/in/haydarkadioglu/)
-
-### Project Details
-- **Latest Version**: 1.0.0
-- **Status**: Active Development
-
-### Contact
-For questions, suggestions, or collaborations:
-- Email: a.haydar.kadioglu@hotmail.com
-- Project Issues: [GitHub Issues](https://github.com/haydarkadioglu/nocle-app/issues)
-
+**Haydar Kadıoğlu**
+- GitHub: [@haydarkadioglu](https://github.com/haydarkadioglu)
+- LinkedIn: [Haydar Kadıoğlu](https://www.linkedin.com/in/haydarkadioglu/)
