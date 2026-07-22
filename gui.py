@@ -1,5 +1,6 @@
 import flet as ft
 import os
+import json
 import numpy as np
 import matplotlib
 matplotlib.use('svg')
@@ -15,6 +16,8 @@ from model_handler import ModelHandler
 from filters import AudioFilters
 import io
 import base64
+
+SETTINGS_FILE = "settings.json"
 
 class NocleGUI:
     def __init__(self, page: ft.Page):
@@ -45,8 +48,38 @@ class NocleGUI:
         self.sample_rate = 16000
         self.total_duration = 0
         
+        # Load saved settings
+        self._saved_settings = self._load_settings()
+        
         self.setup_ui()
         self._load_model()
+
+    def _load_settings(self):
+        """Load settings from settings.json if it exists"""
+        try:
+            if os.path.exists(SETTINGS_FILE):
+                with open(SETTINGS_FILE, 'r') as f:
+                    return json.load(f)
+        except Exception:
+            pass
+        return {}
+
+    def _save_settings(self):
+        """Persist current filter settings to settings.json"""
+        try:
+            settings = {
+                'use_spectral_gate': self.use_spectral_gate.value,
+                'use_wiener': self.use_wiener.value,
+                'use_gaussian': self.use_gaussian.value,
+                'normalize_audio': self.normalize_audio_switch.value,
+                'show_spectrograms': self.show_spectrograms.value,
+                'wiener_size': self.wiener_size.value,
+                'gaussian_sigma': self.gaussian_sigma.value,
+            }
+            with open(SETTINGS_FILE, 'w') as f:
+                json.dump(settings, f, indent=2)
+        except Exception:
+            pass
 
     def show_message(self, text, is_error=False):
         self.page.snack_bar.content = ft.Text(text)
@@ -69,23 +102,32 @@ class NocleGUI:
         # File Selection Area
         self.file_path_text = ft.TextField(label="Selected Audio File", read_only=True, expand=True)
         browse_btn = ft.ElevatedButton(
-            "Browse File", 
+            "Browse File",
             icon=ft.icons.FOLDER_OPEN,
-            on_click=lambda _: self.file_picker.pick_files(allowed_extensions=["wav"], allow_multiple=False),
+            on_click=lambda _: self.file_picker.pick_files(
+                allowed_extensions=["wav", "mp3", "flac", "ogg", "aac", "m4a"],
+                allow_multiple=False
+            ),
             style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8))
         )
         file_row = ft.Row([self.file_path_text, browse_btn], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
 
-        # Filter Options Panel
-        self.use_spectral_gate = ft.Switch(label="Spectral Gate", value=False)
-        self.use_wiener = ft.Switch(label="Wiener Filter", value=False)
-        self.use_gaussian = ft.Switch(label="Gaussian Blur", value=False)
-        self.show_spectrograms = ft.Switch(label="Show Spectrograms", value=False)
-        
-        filter_switches = ft.Row([self.use_spectral_gate, self.use_wiener, self.use_gaussian, self.show_spectrograms], wrap=True)
+        # Filter Options Panel — values loaded from saved settings
+        s = self._saved_settings
+        self.use_spectral_gate = ft.Switch(label="Spectral Gate",  value=s.get('use_spectral_gate', False), on_change=lambda _: self._save_settings())
+        self.use_wiener       = ft.Switch(label="Wiener Filter",   value=s.get('use_wiener', False),         on_change=lambda _: self._save_settings())
+        self.use_gaussian     = ft.Switch(label="Gaussian Blur",   value=s.get('use_gaussian', False),       on_change=lambda _: self._save_settings())
+        self.normalize_audio_switch = ft.Switch(label="Normalize Output", value=s.get('normalize_audio', True), on_change=lambda _: self._save_settings())
+        self.show_spectrograms = ft.Switch(label="Show Spectrograms", value=s.get('show_spectrograms', False), on_change=lambda _: self._save_settings())
 
-        self.wiener_size = ft.TextField(label="Wiener Size", value="15", width=120, keyboard_type=ft.KeyboardType.NUMBER)
-        self.gaussian_sigma = ft.TextField(label="Gaussian Sigma", value="2.0", width=120, keyboard_type=ft.KeyboardType.NUMBER)
+        filter_switches = ft.Row(
+            [self.use_spectral_gate, self.use_wiener, self.use_gaussian,
+             self.normalize_audio_switch, self.show_spectrograms],
+            wrap=True
+        )
+
+        self.wiener_size   = ft.TextField(label="Wiener Size",    value=s.get('wiener_size', '15'),  width=130, keyboard_type=ft.KeyboardType.NUMBER, on_blur=lambda _: self._save_settings())
+        self.gaussian_sigma = ft.TextField(label="Gaussian Sigma", value=s.get('gaussian_sigma', '2.0'), width=140, keyboard_type=ft.KeyboardType.NUMBER, on_blur=lambda _: self._save_settings())
         filter_params = ft.Row([self.wiener_size, self.gaussian_sigma])
 
         filter_panel = ft.Card(
@@ -305,6 +347,10 @@ Mevcut yapay zeka modeli seste oldukça iyi bir temizleme yapar. Ancak çıkan s
                         sr=16000,
                         params=filter_params
                     )
+
+                # Normalize
+                if self.normalize_audio_switch.value:
+                    predicted_audio = self.audio_processor.normalize_audio(predicted_audio)
 
                 self.progress_bar.value = 0.9
                 self.page.update()
