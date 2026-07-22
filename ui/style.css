@@ -321,6 +321,18 @@ body { display: flex; height: 100vh; }
 .guide dl { display: grid; grid-template-columns: 160px 1fr; gap: 10px 16px; align-items: start; }
 .guide dt { font-weight: 500; color: var(--text); font-size: 13px; padding-top: 2px; }
 .guide dd { margin: 0; }
-.guide code { background: var(--border); padding: 1px 5px; border-radius: 4px; font-size: 12px; color: var(--accent-h); }
+.guide code, .guide kbd {
+  background: var(--border);
+  padding: 2px 6px;
+  border-radius: 5px;
+  font-size: 12px;
+  color: var(--accent-h);
+  font-family: inherit;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.guide kbd {
+  box-shadow: 0 2px 0 rgba(0,0,0,0.5);
+  font-weight: 600;
+}
 .guide strong { color: var(--text); }
 .guide em { color: var(--text); font-style: normal; font-weight: 500; }

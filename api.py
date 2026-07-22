@@ -148,15 +148,17 @@ class Api:
         self.is_playing = True
         self.current_player = audio_type
 
+        self.playback_gain = 1.0
+
         def callback(outdata, frames, t, status):
             if not self.is_playing:
                 raise sd.CallbackStop()
             chunk = self.audio_data[self.current_frame: self.current_frame + frames]
             if len(chunk) < frames:
-                outdata[:len(chunk), 0] = chunk
+                outdata[:len(chunk), 0] = chunk * self.playback_gain
                 outdata[len(chunk):] = 0
                 raise sd.CallbackStop()
-            outdata[:, 0] = chunk
+            outdata[:, 0] = chunk * self.playback_gain
             self.current_frame += frames
 
         self.stream = sd.OutputStream(
@@ -224,6 +226,14 @@ class Api:
                 except Exception:
                     break
             time.sleep(0.1)
+
+    def set_playback_gain(self, gain_val):
+        """Set volume gain factor (e.g. 0.0 to 2.0)."""
+        try:
+            self.playback_gain = max(0.0, min(3.0, float(gain_val)))
+            return {"success": True, "gain": self.playback_gain}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     # ── Save ─────────────────────────────────────────────────────────────────
 
