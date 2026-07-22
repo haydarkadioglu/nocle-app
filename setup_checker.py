@@ -1,6 +1,7 @@
 """
 setup_checker.py — Detects missing system dependencies for Nocle.
 """
+import os
 import sounddevice as sd
 
 
