@@ -138,8 +138,7 @@ body { display: flex; height: 100vh; }
   padding: 4px 0;
 }
 .param-row label { font-size: 13px; color: var(--text); }
-.param-row input[type=number] {
-  width: 72px;
+.param-row input[type=number], .select-input {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -150,7 +149,9 @@ body { display: flex; height: 100vh; }
   outline: none;
   transition: border-color 120ms;
 }
-.param-row input:focus { border-color: var(--accent); }
+.param-row input[type=number] { width: 72px; }
+.select-input { min-width: 220px; max-width: 320px; }
+.param-row input:focus, .select-input:focus { border-color: var(--accent); }
 
 /* ── Cards ────────────────────────────────────────────────────────── */
 .card {

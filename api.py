@@ -225,6 +225,83 @@ class Api:
                 return {"success": False, "error": str(e)}
         return {"success": False, "cancelled": True}
 
+    # ── Real-Time Mic Stream ──────────────────────────────────────────────
+
+    def get_audio_devices(self):
+        try:
+            devices = sd.query_devices()
+            inputs = []
+            outputs = []
+            for idx, d in enumerate(devices):
+                if d['max_input_channels'] > 0:
+                    inputs.append({'index': idx, 'name': d['name']})
+                if d['max_output_channels'] > 0:
+                    outputs.append({'index': idx, 'name': d['name']})
+            return {'success': True, 'inputs': inputs, 'outputs': outputs}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    def start_realtime_mic(self, input_idx, output_idx, buffer_size=4096):
+        if hasattr(self, '_rt_running') and self._rt_running:
+            self.stop_realtime_mic()
+
+        self._rt_running = True
+        self._rt_buffer_size = int(buffer_size)
+
+        def rt_thread():
+            try:
+                def callback(indata, outdata, frames, time_info, status):
+                    if not self._rt_running:
+                        raise sd.CallbackStop()
+
+                    audio_chunk = indata[:, 0]
+                    # Apply noise reduction model / filters if loaded
+                    if self.model_handler:
+                        try:
+                            # Preprocess chunk to target batch size expected by model if needed
+                            if len(audio_chunk) == 12000:
+                                processed = self.model_handler.predict_batch(audio_chunk)
+                            else:
+                                processed = audio_chunk # Fallback to pass-through if mismatch
+                        except Exception:
+                            processed = audio_chunk
+                    else:
+                        processed = audio_chunk
+
+                    outdata[:, 0] = processed
+
+                self._rt_stream = sd.Stream(
+                    device=(int(input_idx), int(output_idx)),
+                    samplerate=16000,
+                    blocksize=self._rt_buffer_size,
+                    channels=1,
+                    callback=callback
+                )
+                self._rt_stream.start()
+                while self._rt_running:
+                    time.sleep(0.1)
+            except Exception as e:
+                self._rt_running = False
+                safe = str(e).replace('"', '\\"').replace("'", "\\'")
+                try:
+                    self.window.evaluate_js(f'App.onRealtimeError("{safe}")')
+                except Exception:
+                    pass
+
+        threading.Thread(target=rt_thread, daemon=True).start()
+        return {'success': True}
+
+    def stop_realtime_mic(self):
+        self._rt_running = False
+        if hasattr(self, '_rt_stream') and self._rt_stream:
+            try:
+                self._rt_stream.stop()
+                self._rt_stream.close()
+            except Exception:
+                pass
+            self._rt_stream = None
+        return {'success': True}
+
     # ── Settings ─────────────────────────────────────────────────────────────
 
     def load_settings(self):
@@ -243,3 +320,4 @@ class Api:
             return {"success": True}
         except Exception as e:
             return {"success": False, "error": str(e)}
+

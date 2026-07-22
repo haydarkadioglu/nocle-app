@@ -227,11 +227,86 @@ const App = (() => {
     el.addEventListener('blur',   saveSettings);
   });
 
+  // ── Real-Time Mic Controls ──────────────────────────────────────────
+  let isRtRunning = false;
+  const btnToggleRt  = $('btn-toggle-rt');
+  const selInput     = $('rt-input-device');
+  const selOutput    = $('rt-output-device');
+  const selLatency   = $('rt-latency-mode');
+  const rtStatusDot  = $('rt-status-dot');
+  const rtStatusText = $('rt-status-text');
+
+  async function loadAudioDevices() {
+    const res = await pywebview.api.get_audio_devices();
+    if (!res || !res.success) return;
+
+    selInput.innerHTML = '';
+    selOutput.innerHTML = '';
+
+    res.inputs.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.index;
+      opt.textContent = d.name;
+      selInput.appendChild(opt);
+    });
+
+    res.outputs.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.index;
+      opt.textContent = d.name;
+      if (d.name.toUpperCase().includes('CABLE')) opt.selected = true;
+      selOutput.appendChild(opt);
+    });
+  }
+
+  btnToggleRt.addEventListener('click', async () => {
+    if (!isRtRunning) {
+      btnToggleRt.disabled = true;
+      const inIdx = selInput.value;
+      const outIdx = selOutput.value;
+      const bufSize = selLatency.value;
+
+      const res = await pywebview.api.start_realtime_mic(inIdx, outIdx, bufSize);
+      btnToggleRt.disabled = false;
+
+      if (res && res.success) {
+        isRtRunning = true;
+        btnToggleRt.textContent = 'Stop Live Mic';
+        btnToggleRt.className = 'btn btn-primary';
+        rtStatusDot.className = 'status-dot ready';
+        rtStatusText.textContent = 'Live mic active — routing audio';
+      } else {
+        rtStatusDot.className = 'status-dot error';
+        rtStatusText.textContent = 'Failed to start live stream';
+      }
+    } else {
+      btnToggleRt.disabled = true;
+      await pywebview.api.stop_realtime_mic();
+      btnToggleRt.disabled = false;
+      isRtRunning = false;
+      btnToggleRt.textContent = 'Start Live Mic';
+      btnToggleRt.className = 'btn btn-accent';
+      rtStatusDot.className = 'status-dot';
+      rtStatusText.textContent = 'Live mic stopped';
+    }
+  });
+
+  function onRealtimeError(msg) {
+    isRtRunning = false;
+    btnToggleRt.textContent = 'Start Live Mic';
+    btnToggleRt.className = 'btn btn-accent';
+    rtStatusDot.className = 'status-dot error';
+    rtStatusText.textContent = 'Error: ' + msg;
+  }
+
   // ── Boot ─────────────────────────────────────────────────────────
   async function boot() {
     // Load saved settings
     const s = await pywebview.api.load_settings();
     if (s) applySettings(s);
+
+    // Load audio devices for RT tab
+    loadAudioDevices();
 
     // Load model
     setStatus('Loading model…', 'working');
@@ -244,5 +319,6 @@ const App = (() => {
   window.addEventListener('pywebviewready', boot);
 
   // Expose callbacks for Python → JS calls
-  return { onProcessingDone, onProcessingError, onTimeUpdate, onPlaybackFinished, setSpectrogram };
+  return { onProcessingDone, onProcessingError, onTimeUpdate, onPlaybackFinished, setSpectrogram, onRealtimeError };
 })();
+

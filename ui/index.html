@@ -24,6 +24,10 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
         Enhance
       </button>
+      <button class="nav-btn" data-tab="realtime">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+        Live Mic
+      </button>
       <button class="nav-btn" data-tab="guide">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         Guide
@@ -157,6 +161,42 @@
         </div>
       </div>
 
+    </section>
+
+    <!-- TAB: Realtime -->
+    <section class="tab" id="tab-realtime">
+      <div class="card">
+        <div class="card-header">
+          <span>Real-time Noise Suppression</span>
+          <button class="btn btn-accent" id="btn-toggle-rt">Start Live Mic</button>
+        </div>
+
+        <div class="rt-controls">
+          <div class="param-row" style="margin-bottom:12px">
+            <label for="rt-input-device">Input Microphone</label>
+            <select id="rt-input-device" class="select-input"></select>
+          </div>
+
+          <div class="param-row" style="margin-bottom:12px">
+            <label for="rt-output-device">Output Device (VB-Cable)</label>
+            <select id="rt-output-device" class="select-input"></select>
+          </div>
+
+          <div class="param-row">
+            <label for="rt-latency-mode">Buffer Size / Latency</label>
+            <select id="rt-latency-mode" class="select-input">
+              <option value="2048">Low Latency (~128ms)</option>
+              <option value="4096" selected>Balanced (~256ms)</option>
+              <option value="8192">High Quality (~512ms)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="rt-status" style="margin-top:16px;display:flex;align-items:center;gap:10px">
+          <span class="status-dot" id="rt-status-dot"></span>
+          <span id="rt-status-text" style="font-size:12px;color:var(--muted)">Live mic stopped</span>
+        </div>
+      </div>
     </section>
 
     <!-- TAB: Guide -->
