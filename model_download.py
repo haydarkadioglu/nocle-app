@@ -11,7 +11,7 @@ def download_model():
     
     # Skip download if model already exists
     if os.path.exists(model_path):
-        print("✅ Model already exists:", model_path)
+        print("[OK] Model already exists:", model_path)
         return True
 
     # Use LFS URL format and proper headers for binary file download
@@ -39,13 +39,13 @@ def download_model():
                     
         # Verify file was downloaded successfully
         if os.path.getsize(model_path) > 0:
-            print("✅ Model downloaded successfully:", model_path)
+            print("[OK] Model downloaded successfully:", model_path)
             return True
         else:
             raise Exception("Downloaded file is empty")
             
     except Exception as e:
-        print(f"❌ Download error: {str(e)}")
+        print(f"[ERROR] Download error: {str(e)}")
         if os.path.exists(model_path):
             os.remove(model_path)  # Remove failed download
         return False
